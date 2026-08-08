@@ -59,7 +59,7 @@ def run_agent_query(
 ) -> tuple[str, dict]:
     assert_llm_configured()
     per_step = _estimated_tokens_per_step()
-    assert_quota_available(db, org_id, estimated_tokens=per_step * MAX_AGENT_STEPS)
+    assert_quota_available(db, org_id, estimated_tokens=per_step)
 
     started = time.perf_counter()
     tool_names = ", ".join(TOOL_REGISTRY.keys())
@@ -88,9 +88,11 @@ def run_agent_query(
             raise
 
         p, c, t = _aggregate_usage(usage)
+        step_tokens = t if t > 0 else max(1, (len(user_msg) + len(reply or "")) // 4)
         total_prompt += p
         total_completion += c
-        total_tokens += t if t > 0 else max(1, (len(user_msg) + len(reply or "")) // 4)
+        total_tokens += step_tokens
+        record_usage(db, org_id, step_tokens)
 
         append_run_step(
             db,
@@ -143,9 +145,6 @@ def run_agent_query(
 
     if not final_answer:
         final_answer = "Yeterli veri toplanamadı; lütfen soruyu daraltın veya dashboard KPI’larına bakın."
-
-    if total_tokens > 0:
-        record_usage(db, org_id, total_tokens)
 
     duration_ms = int((time.perf_counter() - started) * 1000)
     output = {"answer": final_answer, "steps_used": step_idx}

@@ -100,7 +100,32 @@ def test_assert_quota_available_raises_when_exhausted(monkeypatch):
         assert_quota_available(db, 1, estimated_tokens=10)
 
 
-def test_agent_multi_step_token_aggregation_and_record_usage():
+def test_agent_single_step_records_usage_immediately():
+    from ai.capabilities.run_agent import run_agent_query
+    from database import AiRun
+
+    db = MagicMock()
+    run = AiRun(id=1, user_id=10, steps_json="[]")
+    user = MagicMock()
+
+    with patch("ai.capabilities.run_agent.assert_llm_configured"):
+        with patch(
+            "ai.capabilities.run_agent.chat_completion",
+            return_value=('{"final":"Tamam"}', {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}),
+        ):
+            with patch("ai.capabilities.run_agent.assert_quota_available"):
+                with patch("ai.capabilities.run_agent.record_usage") as mock_record:
+                    with patch("ai.capabilities.run_agent.append_run_step"):
+                        answer, meta = run_agent_query(
+                            db, user=user, org_id=10, run=run, question="Test?"
+                        )
+
+    assert answer == "Tamam"
+    assert meta["tokens_total"] == 150
+    mock_record.assert_called_once_with(db, 10, 150)
+
+
+def test_agent_multi_step_records_usage_after_each_llm_call():
     from ai.capabilities.run_agent import run_agent_query
     from database import AiRun
 
@@ -109,28 +134,163 @@ def test_agent_multi_step_token_aggregation_and_record_usage():
     user = MagicMock()
 
     usages = [
-        {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
-        {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+        {"prompt_tokens": 1000, "completion_tokens": 500, "total_tokens": 1500},
+        {"prompt_tokens": 800, "completion_tokens": 200, "total_tokens": 2000},
     ]
-    replies = ['{"final":"Tamam"}', "unused"]
+    replies = [
+        '{"tool":"get_kpis","args":{"period_type":"monthly"}}',
+        '{"final":"Tamam"}',
+    ]
 
     with patch("ai.capabilities.run_agent.assert_llm_configured"):
         with patch("ai.capabilities.run_agent.chat_completion") as mock_chat:
-            mock_chat.side_effect = [(replies[0], usages[0]), (replies[1], usages[1])]
+            mock_chat.side_effect = list(zip(replies, usages))
             with patch("ai.capabilities.run_agent.assert_quota_available"):
-                with patch("ai.capabilities.run_agent.record_usage") as mock_record:
-                    with patch("ai.capabilities.run_agent.append_run_step"):
-                        answer, meta = run_agent_query(
-                            db,
-                            user=user,
-                            org_id=10,
-                            run=run,
-                            question="Test?",
-                        )
+                with patch("ai.capabilities.run_agent.execute_tool", return_value={"ok": True}):
+                    with patch("ai.capabilities.run_agent.record_usage") as mock_record:
+                        with patch("ai.capabilities.run_agent.append_run_step"):
+                            answer, meta = run_agent_query(
+                                db, user=user, org_id=10, run=run, question="Test?"
+                            )
 
     assert answer == "Tamam"
-    assert meta["tokens_total"] == 150
-    mock_record.assert_called_once_with(db, 10, 150)
+    assert meta["tokens_total"] == 3500
+    assert mock_record.call_count == 2
+    mock_record.assert_any_call(db, 10, 1500)
+    mock_record.assert_any_call(db, 10, 2000)
+
+
+def test_agent_no_upfront_max_steps_quota_reservation():
+    from ai.capabilities.run_agent import _estimated_tokens_per_step, run_agent_query
+    from database import AiRun
+
+    db = MagicMock()
+    run = AiRun(id=1, user_id=10, steps_json="[]")
+    user = MagicMock()
+    per_step = _estimated_tokens_per_step()
+
+    with patch("ai.capabilities.run_agent.assert_llm_configured"):
+        with patch(
+            "ai.capabilities.run_agent.chat_completion",
+            return_value=('{"final":"x"}', {"total_tokens": 10}),
+        ):
+            with patch("ai.capabilities.run_agent.assert_quota_available") as mock_assert:
+                with patch("ai.capabilities.run_agent.record_usage"):
+                    with patch("ai.capabilities.run_agent.append_run_step"):
+                        run_agent_query(db, user=user, org_id=10, run=run, question="Q")
+
+    first = mock_assert.call_args_list[0]
+    assert first.args[1] == 10
+    assert first.kwargs["estimated_tokens"] == per_step
+    assert first.kwargs["estimated_tokens"] != per_step * 5
+
+
+def test_agent_second_step_sees_updated_quota_remaining():
+    from ai.capabilities.run_agent import run_agent_query
+    from database import AiRun
+
+    db = MagicMock()
+    run = AiRun(id=1, user_id=10, steps_json="[]")
+    user = MagicMock()
+    quota = 10_000
+    used = {"n": 0}
+    remaining_at_assert: list[int] = []
+
+    def fake_record(_db, _org, tokens):
+        used["n"] += tokens
+
+    def fake_assert(_db, _org, *, estimated_tokens=0):
+        rem = quota - used["n"]
+        remaining_at_assert.append(rem)
+        if rem <= 0 or (estimated_tokens and rem < estimated_tokens):
+            raise QuotaExceededError("limit")
+
+    usages = [
+        {"total_tokens": 1500},
+        {"total_tokens": 2000},
+    ]
+    replies = [
+        '{"tool":"get_kpis","args":{"period_type":"monthly"}}',
+        '{"final":"done"}',
+    ]
+
+    with patch("ai.capabilities.run_agent.assert_llm_configured"):
+        with patch("ai.capabilities.run_agent.chat_completion") as mock_chat:
+            mock_chat.side_effect = list(zip(replies, usages))
+            with patch("ai.capabilities.run_agent.assert_quota_available", side_effect=fake_assert):
+                with patch("ai.capabilities.run_agent.record_usage", side_effect=fake_record):
+                    with patch("ai.capabilities.run_agent.execute_tool", return_value={}):
+                        with patch("ai.capabilities.run_agent.append_run_step"):
+                            run_agent_query(db, user=user, org_id=10, run=run, question="Q")
+
+    # İlk kontrol (request) + step 1 başlangıcı henüz usage yok; step 2 başlangıcı 1500 düşmüş olmalı
+    assert remaining_at_assert[0] == 10_000
+    assert remaining_at_assert[1] == 10_000
+    assert remaining_at_assert[2] == 8_500
+
+
+def test_agent_exception_after_first_step_keeps_recorded_tokens():
+    from ai.capabilities.run_agent import run_agent_query
+    from database import AiRun
+
+    db = MagicMock()
+    run = AiRun(id=1, user_id=10, steps_json="[]")
+    user = MagicMock()
+    recorded: list[int] = []
+
+    def fake_record(_db, _org, tokens):
+        recorded.append(tokens)
+
+    with patch("ai.capabilities.run_agent.assert_llm_configured"):
+        with patch("ai.capabilities.run_agent.chat_completion") as mock_chat:
+            mock_chat.side_effect = [
+                ('{"tool":"get_kpis","args":{}}', {"total_tokens": 1500}),
+                RuntimeError("llm failed"),
+            ]
+            with patch("ai.capabilities.run_agent.assert_quota_available"):
+                with patch("ai.capabilities.run_agent.record_usage", side_effect=fake_record):
+                    with patch("ai.capabilities.run_agent.execute_tool", return_value={}):
+                        with patch("ai.capabilities.run_agent.append_run_step"):
+                            with pytest.raises(RuntimeError):
+                                run_agent_query(db, user=user, org_id=10, run=run, question="Q")
+
+    assert recorded == [1500]
+
+
+def test_agent_low_quota_blocks_second_llm_step():
+    from ai.capabilities.run_agent import run_agent_query, _estimated_tokens_per_step
+    from database import AiRun
+
+    db = MagicMock()
+    run = AiRun(id=1, user_id=10, steps_json="[]")
+    user = MagicMock()
+    quota = 10_000
+    used = {"n": 0}
+    per_step = _estimated_tokens_per_step()
+
+    def fake_record(_db, _org, tokens):
+        used["n"] += tokens
+
+    def fake_assert(_db, _org, *, estimated_tokens=0):
+        rem = quota - used["n"]
+        if rem <= 0 or (estimated_tokens and rem < estimated_tokens):
+            raise QuotaExceededError("limit")
+
+    with patch("ai.capabilities.run_agent.assert_llm_configured"):
+        with patch("ai.capabilities.run_agent.chat_completion") as mock_chat:
+            mock_chat.return_value = (
+                '{"tool":"get_kpis","args":{}}',
+                {"total_tokens": quota - per_step + 1},
+            )
+            with patch("ai.capabilities.run_agent.assert_quota_available", side_effect=fake_assert):
+                with patch("ai.capabilities.run_agent.record_usage", side_effect=fake_record):
+                    with patch("ai.capabilities.run_agent.execute_tool", return_value={}):
+                        with patch("ai.capabilities.run_agent.append_run_step"):
+                            with pytest.raises(QuotaExceededError):
+                                run_agent_query(db, user=user, org_id=10, run=run, question="Q")
+
+    assert used["n"] == quota - per_step + 1
+    assert mock_chat.call_count == 1
 
 
 def test_agent_quota_exhausted_before_llm():
