@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from database import LeadActivity
 from funnel import build_sales_funnel
 from reports import _format_period_label, _lead_created_in_range, _month_bounds, _week_bounds
+
+RELIABLE_OFFER_ACTIVITY_TYPE = "teklif_verildi"
 
 
 def comparison_period_bounds(period_type: str, anchor: date) -> tuple[date, date, date, date]:
@@ -51,3 +57,24 @@ def funnel_transition_rate(leads: list, from_stage: str, to_stage: str) -> tuple
         return None, from_count, to_count
     rate = round((to_count / from_count) * 100, 1)
     return rate, from_count, to_count
+
+
+def get_reliable_offer_given_dates(db: Session, org_id: int, lead_ids: list[int]) -> dict[int, date]:
+    """
+    First ``teklif_verildi`` activity date per lead — güvenilir teklif veriliş zamanı.
+    Lead modelinde ayrı teklif tarihi alanı yok; yalnızca bu aktivite tipi kullanılır.
+    """
+    if not lead_ids:
+        return {}
+
+    rows = (
+        db.query(LeadActivity.lead_id, func.min(LeadActivity.activity_date))
+        .filter(
+            LeadActivity.user_id == org_id,
+            LeadActivity.lead_id.in_(lead_ids),
+            LeadActivity.activity_type == RELIABLE_OFFER_ACTIVITY_TYPE,
+        )
+        .group_by(LeadActivity.lead_id)
+        .all()
+    )
+    return {lead_id: activity_date.date() for lead_id, activity_date in rows if activity_date}

@@ -26,10 +26,11 @@ from intelligence.diagnosis.evidence import (
     cohort_leads_in_range,
     comparison_period_bounds,
     funnel_transition_rate,
+    get_reliable_offer_given_dates,
     period_label,
 )
 from intelligence.diagnosis.models import DiagnosisResult
-from reminders import get_last_activity_dates, get_last_contact_date, parse_date
+from reminders import get_last_activity_dates, parse_date
 
 
 def _relative_change_percent(current: float, previous: float) -> float | None:
@@ -125,6 +126,18 @@ def _funnel_description(from_stage: str, to_stage: str, prev: float, cur: float)
     )
 
 
+def _real_contact_date(lead: Lead, activity_dates: dict[int, date]) -> date | None:
+    """Gerçek iletişim; created_at fallback yok (no-contact ayrımı için)."""
+    candidates: list[date] = []
+    for value in (lead.ilk_mesaj_tarihi, lead.demo_tarihi, lead.gorusme_tarihi):
+        parsed = parse_date(value or "")
+        if parsed:
+            candidates.append(parsed)
+    if lead.id in activity_dates:
+        candidates.append(activity_dates[lead.id])
+    return max(candidates) if candidates else None
+
+
 def detect_follow_up_problems(db: Session, org_id: int, leads: list[Lead]) -> list[DiagnosisResult]:
     today = local_today()
     active = [lead for lead in leads if lead.durum not in INACTIVE_STATUSES]
@@ -134,22 +147,39 @@ def detect_follow_up_problems(db: Session, org_id: int, leads: list[Lead]) -> li
     lead_ids = [lead.id for lead in active]
     activity_dates = get_last_activity_dates(db, org_id, lead_ids)
 
-    idle: list[dict] = []
+    idle_contact: list[dict] = []
+    no_contact: list[dict] = []
     for lead in active:
-        last_contact = get_last_contact_date(lead, activity_dates)
-        if not last_contact:
+        last_contact = _real_contact_date(lead, activity_dates)
+        if last_contact:
+            days_idle = (today - last_contact).days
+            if days_idle < FOLLOWUP_IDLE_DAYS_MEDIUM:
+                continue
+            idle_contact.append(
+                {
+                    "lead_id": lead.id,
+                    "days_idle": days_idle,
+                    "durum": lead.durum,
+                    "reason": "idle_after_contact",
+                }
+            )
             continue
-        days_idle = (today - last_contact).days
-        if days_idle < FOLLOWUP_IDLE_DAYS_MEDIUM:
+
+        if not lead.created_at:
             continue
-        idle.append(
+        days_since_created = (today - lead.created_at.date()).days
+        if days_since_created < FOLLOWUP_IDLE_DAYS_MEDIUM:
+            continue
+        no_contact.append(
             {
                 "lead_id": lead.id,
-                "days_idle": days_idle,
+                "days_idle": days_since_created,
                 "durum": lead.durum,
+                "reason": "no_contact",
             }
         )
 
+    idle = idle_contact + no_contact
     if len(idle) < FOLLOWUP_MIN_AFFECTED_LEADS:
         return []
 
@@ -166,28 +196,40 @@ def detect_follow_up_problems(db: Session, org_id: int, leads: list[Lead]) -> li
         return []
 
     detected_at = local_now().isoformat()
+    no_contact_count = len(no_contact)
+    idle_contact_count = len(idle_contact)
+    desc_parts = []
+    if idle_contact_count:
+        desc_parts.append(f"{idle_contact_count} lead'de son temas {FOLLOWUP_IDLE_DAYS_MEDIUM}+ gün önce")
+    if no_contact_count:
+        desc_parts.append(f"{no_contact_count} lead'de hiç gerçek temas yok ({FOLLOWUP_IDLE_DAYS_MEDIUM}+ gün)")
+    description = "; ".join(desc_parts) + f"; en uzun süre {max_idle} gün."
+
     return [
         DiagnosisResult(
             diagnosis_id="follow_up_idle_leads",
             type="follow_up",
             severity=severity,
             title="Takip gerektiren aktif lead'ler",
-            description=(
-                f"{len(idle)} aktif lead'de son gerçek temas "
-                f"{FOLLOWUP_IDLE_DAYS_MEDIUM}+ gün önce; en uzun süre {max_idle} gün."
-            ),
+            description=description,
             metric="days_since_last_contact",
             current_value=float(max_idle),
             previous_value=None,
             change_percent=None,
             evidence={
                 "affected_lead_count": len(idle),
+                "idle_contact_count": idle_contact_count,
+                "no_contact_count": no_contact_count,
                 "oldest_days_idle": max_idle,
                 "average_days_idle": avg_idle,
                 "threshold_medium_days": FOLLOWUP_IDLE_DAYS_MEDIUM,
                 "threshold_high_days": FOLLOWUP_IDLE_DAYS_HIGH,
                 "sample_lead_ids": [r["lead_id"] for r in sorted(idle, key=lambda x: -x["days_idle"])[:10]],
-                "worst_case": {"lead_id": oldest["lead_id"], "days_idle": oldest["days_idle"]},
+                "worst_case": {
+                    "lead_id": oldest["lead_id"],
+                    "days_idle": oldest["days_idle"],
+                    "reason": oldest.get("reason"),
+                },
             },
             affected_lead_count=len(idle),
             detected_at=detected_at,
@@ -195,21 +237,11 @@ def detect_follow_up_problems(db: Session, org_id: int, leads: list[Lead]) -> li
     ]
 
 
-def _offer_reference_date(lead: Lead, activity_dates: dict[int, date]) -> date | None:
-    """Best-effort offer pending anchor without status history (no updated_at)."""
+def _offer_reference_date(lead: Lead, offer_given_dates: dict[int, date]) -> date | None:
+    """Yalnızca ``teklif_verildi`` aktivitesinden gelen güvenilir teklif tarihi."""
     if lead.durum not in PENDING_OFFER_STATUS:
         return None
-    candidates: list[date] = []
-    for value in (lead.gorusme_tarihi, lead.demo_tarihi):
-        parsed = parse_date(value or "")
-        if parsed:
-            candidates.append(parsed)
-    last_contact = get_last_contact_date(lead, activity_dates)
-    if last_contact:
-        candidates.append(last_contact)
-    if not candidates:
-        return None
-    return max(candidates)
+    return offer_given_dates.get(lead.id)
 
 
 def detect_offer_problems(db: Session, org_id: int, leads: list[Lead]) -> list[DiagnosisResult]:
@@ -219,11 +251,11 @@ def detect_offer_problems(db: Session, org_id: int, leads: list[Lead]) -> list[D
         return []
 
     lead_ids = [lead.id for lead in pending]
-    activity_dates = get_last_activity_dates(db, org_id, lead_ids)
+    offer_given_dates = get_reliable_offer_given_dates(db, org_id, lead_ids)
 
     aged: list[dict] = []
     for lead in pending:
-        ref = _offer_reference_date(lead, activity_dates)
+        ref = _offer_reference_date(lead, offer_given_dates)
         if not ref:
             continue
         age_days = (today - ref).days

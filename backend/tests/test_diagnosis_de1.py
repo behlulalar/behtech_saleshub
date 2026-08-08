@@ -202,6 +202,41 @@ def test_follow_up_uses_activity_not_updated_at(monkeypatch):
         assert detect_follow_up_problems(db, 1, [lead]) == []
 
 
+def test_follow_up_new_lead_no_contact_excluded(monkeypatch):
+    db = MagicMock()
+    today = date(2026, 8, 10)
+    monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
+    lead = _lead(1, "Yeni", created=date(2026, 8, 9))
+    lead.created_at = datetime(2026, 8, 9, 10, 0, 0)
+    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+        assert detect_follow_up_problems(db, 1, [lead]) == []
+
+
+def test_follow_up_old_lead_no_contact_included(monkeypatch):
+    db = MagicMock()
+    today = date(2026, 8, 10)
+    monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
+    lead = _lead(1, "Yeni", created=date(2026, 8, 1))
+    lead.created_at = datetime(2026, 8, 1, 10, 0, 0)
+    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+        items = detect_follow_up_problems(db, 1, [lead])
+    assert len(items) == 1
+    assert items[0].evidence["no_contact_count"] == 1
+    assert items[0].evidence["idle_contact_count"] == 0
+    assert items[0].evidence["worst_case"]["reason"] == "no_contact"
+
+
+def test_follow_up_idle_contact_evidence_unchanged(monkeypatch):
+    db = MagicMock()
+    today = date(2026, 8, 10)
+    monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
+    lead = _lead(1, "İletişime Geçildi", created=date(2026, 7, 1), ilk_mesaj="2026-08-04")
+    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+        items = detect_follow_up_problems(db, 10, [lead])
+    assert items[0].evidence["idle_contact_count"] == 1
+    assert items[0].evidence["no_contact_count"] == 0
+
+
 # --- offer ---
 
 
@@ -210,10 +245,13 @@ def test_offer_normal_pending_no_diagnosis(monkeypatch):
     today = date(2026, 8, 10)
     monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
     leads = [
-        _lead(1, "Teklif Verildi", created=date(2026, 8, 1), gorusme_tarihi="2026-08-08"),
-        _lead(2, "Teklif Verildi", created=date(2026, 8, 1), gorusme_tarihi="2026-08-09"),
+        _lead(1, "Teklif Verildi", created=date(2026, 8, 1)),
+        _lead(2, "Teklif Verildi", created=date(2026, 8, 1)),
     ]
-    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+    with patch(
+        "intelligence.diagnosis.rules.get_reliable_offer_given_dates",
+        return_value={1: date(2026, 8, 8), 2: date(2026, 8, 9)},
+    ):
         assert detect_offer_problems(db, 1, leads) == []
 
 
@@ -222,14 +260,54 @@ def test_offer_old_pending_diagnosis(monkeypatch):
     today = date(2026, 8, 20)
     monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
     leads = [
-        _lead(1, "Teklif Verildi", created=date(2026, 7, 1), gorusme_tarihi="2026-08-01"),
-        _lead(2, "Teklif Verildi", created=date(2026, 7, 1), gorusme_tarihi="2026-08-02"),
+        _lead(1, "Teklif Verildi", created=date(2026, 7, 1)),
+        _lead(2, "Teklif Verildi", created=date(2026, 7, 1)),
     ]
-    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+    with patch(
+        "intelligence.diagnosis.rules.get_reliable_offer_given_dates",
+        return_value={1: date(2026, 8, 1), 2: date(2026, 8, 2)},
+    ):
         items = detect_offer_problems(db, 1, leads)
     assert len(items) == 1
     assert items[0].type == "offer"
     assert items[0].severity in ("medium", "high")
+
+
+def test_offer_age_ignores_later_contact(monkeypatch):
+    db = MagicMock()
+    today = date(2026, 8, 10)
+    monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
+    leads = [
+        _lead(1, "Teklif Verildi", created=date(2026, 7, 1), gorusme_tarihi="2026-08-07"),
+        _lead(2, "Teklif Verildi", created=date(2026, 7, 1), gorusme_tarihi="2026-08-07"),
+    ]
+    with patch(
+        "intelligence.diagnosis.rules.get_reliable_offer_given_dates",
+        return_value={1: date(2026, 8, 1), 2: date(2026, 8, 1)},
+    ):
+        with patch(
+            "intelligence.diagnosis.rules.get_last_activity_dates",
+            return_value={1: date(2026, 8, 7), 2: date(2026, 8, 7)},
+        ):
+            items = detect_offer_problems(db, 1, leads)
+    assert len(items) == 1
+    assert items[0].evidence["max_offer_age_days"] == 9
+
+
+def test_offer_no_reliable_date_skips_gorusme_and_contact(monkeypatch):
+    db = MagicMock()
+    today = date(2026, 8, 20)
+    monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: today)
+    leads = [
+        _lead(1, "Teklif Verildi", created=date(2026, 1, 1), gorusme_tarihi="2026-08-01"),
+        _lead(2, "Teklif Verildi", created=date(2026, 1, 1), gorusme_tarihi="2026-08-02"),
+    ]
+    with patch("intelligence.diagnosis.rules.get_reliable_offer_given_dates", return_value={}):
+        with patch(
+            "intelligence.diagnosis.rules.get_last_activity_dates",
+            return_value={1: date(2026, 8, 15), 2: date(2026, 8, 16)},
+        ):
+            assert detect_offer_problems(db, 1, leads) == []
 
 
 def test_offer_terminal_excluded(monkeypatch):
@@ -243,7 +321,7 @@ def test_offer_insufficient_dated_pending(monkeypatch):
     db = MagicMock()
     monkeypatch.setattr("intelligence.diagnosis.rules.local_today", lambda: date(2026, 8, 20))
     leads = [_lead(1, "Teklif Verildi", created=date(2026, 1, 1))]
-    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+    with patch("intelligence.diagnosis.rules.get_reliable_offer_given_dates", return_value={}):
         assert detect_offer_problems(db, 1, leads) == []
 
 
