@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /register
+
+Disallow: /api/
+Disallow: /login
+Disallow: /verify-email
+Disallow: /reset-password
+
+Sitemap: https://saleshub.behtechlabs.com/sitemap.xml
