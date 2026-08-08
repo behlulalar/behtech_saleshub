@@ -14,15 +14,19 @@ from intelligence.action_proposals import (
 )
 from intelligence.analytics_engine import compute_kpis
 from intelligence.company_profile import get_org_profile
+from intelligence.diagnosis.engine import compute_diagnoses
 from intelligence.insights import insight_to_dict, list_active_insights, org_insights_deterministic, persist_insights
 from reports import parse_report_anchor
 from roles import get_org_id, require_owner
+from config import settings
 from schemas import (
     ActionProposalCreateRequest,
     ActionProposalItem,
     ActionProposalListResponse,
     ActionProposalResolveRequest,
     CompanyProfileResponse,
+    DiagnosisItem,
+    DiagnosisListResponse,
     IntelligenceInsightItem,
     IntelligenceInsightsResponse,
     IntelligenceKpisResponse,
@@ -71,6 +75,46 @@ def get_intelligence_insights(
     rows = list_active_insights(db, org_id, limit=limit)
     return IntelligenceInsightsResponse(
         items=[IntelligenceInsightItem(**insight_to_dict(row)) for row in rows]
+    )
+
+
+@router.get("/diagnoses", response_model=DiagnosisListResponse)
+def get_intelligence_diagnoses(
+    period: str = Query(default="monthly", pattern="^(daily|weekly|monthly)$"),
+    date: Optional[str] = Query(default=None, description="YYYY-MM-DD veya monthly için YYYY-MM"),
+    diagnosis_type: Optional[str] = Query(
+        default=None,
+        alias="type",
+        pattern="^(funnel_drop|follow_up|offer)$",
+    ),
+    severity: Optional[str] = Query(default=None, pattern="^(low|medium|high|critical)$"),
+    db: Session = Depends(get_db),
+    user: User = Depends(verify_token),
+):
+    if not settings.diagnosis_engine_enabled:
+        raise HTTPException(status_code=404, detail="Diagnosis Engine etkin değil")
+
+    org_id = get_org_id(user)
+    anchor: date | None = None
+    if period == "monthly" and date and len(date) >= 7:
+        anchor = parse_report_anchor("monthly", None, date[:7])
+    elif date:
+        anchor = parse_report_anchor(period, date, None)
+
+    data = compute_diagnoses(
+        db,
+        org_id,
+        period_type=period,
+        anchor=anchor,
+        diagnosis_type=diagnosis_type,
+        severity=severity,
+    )
+    return DiagnosisListResponse(
+        items=[DiagnosisItem(**item) for item in data["items"]],
+        generated_at=data["generated_at"],
+        duration_ms=data["duration_ms"],
+        period_type=data["period_type"],
+        anchor=data["anchor"],
     )
 
 

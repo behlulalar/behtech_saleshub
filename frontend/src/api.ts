@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setToken, setUsername, clearRememberCredentials, setSavedPassword, setIdleTimeoutMinutes, setRememberPreference } from './auth';
 
 const API_BASE = '/api';
@@ -548,6 +548,9 @@ export const api = {
 
   getCompanyProfile: (refresh = false) =>
     request<CompanyProfile>(`/intelligence/company-profile?refresh=${refresh ? 'true' : 'false'}`),
+
+  listDiagnoses: (period = 'monthly') =>
+    request<DiagnosisListResponse>(`/intelligence/diagnoses?period=${period}`),
 
   sendAiChat: (body: AiChatRequest) =>
     request<AiChatResponse>('/ai/chat', {

@@ -22,6 +22,7 @@ import StatusBadge from './StatusBadge';
 import AiPriorityList from './ai/AiPriorityList';
 import AiOpsPanel from './ai/AiOpsPanel';
 import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
+import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
 import AiActionProposals from './ai/AiActionProposals';
 
 interface Props {
@@ -161,6 +162,7 @@ export default function Dashboard({
       </div>
 
       <CompanyIntelligenceCard isOwner={isOwner} />
+      <SalesDiagnosesCard />
 
       <AiPriorityList
         isOwner={isOwner}

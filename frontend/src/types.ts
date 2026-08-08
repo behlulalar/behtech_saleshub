@@ -369,6 +369,29 @@ export interface IntelligenceInsightItem {
   created_at: string;
 }
 
+export interface DiagnosisItem {
+  diagnosis_id: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  metric: string;
+  current_value?: number | null;
+  previous_value?: number | null;
+  change_percent?: number | null;
+  evidence?: Record<string, unknown>;
+  affected_lead_count: number;
+  detected_at: string;
+}
+
+export interface DiagnosisListResponse {
+  generated_at: string;
+  duration_ms: number;
+  period_type: string;
+  anchor: string;
+  items: DiagnosisItem[];
+}
+
 export interface SummarizeLeadRequest {
   lead_id: number;
   locale?: string;

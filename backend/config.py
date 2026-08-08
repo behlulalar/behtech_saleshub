@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     seed_admin_email: str = "behlul@local.crm"
     seed_admin_password: str = "MuhammeD''123"
     followup_reminder_days: int = 3
+    diagnosis_engine_enabled: bool = True
     meeting_reminder_days: int = 3
     automation_email_enabled: bool = True
     company_email_domains: str = "behtechlabs.com"

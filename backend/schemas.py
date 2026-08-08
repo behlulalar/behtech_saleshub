@@ -745,6 +745,29 @@ class IntelligenceInsightsResponse(BaseModel):
     items: list[IntelligenceInsightItem]
 
 
+class DiagnosisItem(BaseModel):
+    diagnosis_id: str
+    type: str
+    severity: str
+    title: str
+    description: str
+    metric: str
+    current_value: float | None = None
+    previous_value: float | None = None
+    change_percent: float | None = None
+    evidence: dict = Field(default_factory=dict)
+    affected_lead_count: int = 0
+    detected_at: str = ""
+
+
+class DiagnosisListResponse(BaseModel):
+    generated_at: str
+    duration_ms: int = 0
+    period_type: str
+    anchor: str
+    items: list[DiagnosisItem] = Field(default_factory=list)
+
+
 class SummarizeLeadRequest(BaseModel):
     lead_id: int = Field(gt=0)
     locale: str = Field(default="tr", max_length=8)
