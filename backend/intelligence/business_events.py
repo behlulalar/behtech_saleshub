@@ -11,6 +11,7 @@ from database import BusinessEvent
 STAGE_CHANGED = "StageChanged"
 LEAD_CREATED = "LeadCreated"
 LEAD_WON = "LeadWon"
+LEAD_LOST = "LeadLost"
 TASK_COMPLETED = "TaskCompleted"
 OFFER_SENT = "OfferSent"
 RECOMMENDATION_ACCEPTED = "RecommendationAccepted"

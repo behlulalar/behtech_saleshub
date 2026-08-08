@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ai.capabilities.batch_score_leads import run_batch_score_leads
 from ai.capabilities.run_agent import run_agent_query
 from ai.store import finish_run_failed, finish_run_success, mark_run_running
+from ai.usage import QuotaExceededError
 from database import AiRun, User
 
 
@@ -61,11 +62,17 @@ def execute_run(db: Session, run: AiRun) -> None:
                 run,
                 output_data=meta["output"],
                 duration_ms=meta.get("duration_ms"),
+                tokens_prompt=meta.get("tokens_prompt"),
+                tokens_completion=meta.get("tokens_completion"),
                 tokens_total=meta.get("tokens_total"),
             )
             return
 
         finish_run_failed(db, run, error_code="unknown_run_type", duration_ms=0)
+    except QuotaExceededError:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        finish_run_failed(db, run, error_code="quota_exhausted", duration_ms=duration_ms)
+        return
     except Exception:
         duration_ms = int((time.perf_counter() - started) * 1000)
         finish_run_failed(db, run, error_code="execution_error", duration_ms=duration_ms)

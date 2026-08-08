@@ -20,7 +20,14 @@ def _priority_weight(oncelik: str) -> int:
     return 10
 
 
-def score_lead(db: Session, org_id: int, lead: Lead, *, today: date | None = None) -> tuple[int, list[str], str]:
+def score_lead(
+    db: Session,
+    org_id: int,
+    lead: Lead,
+    *,
+    today: date | None = None,
+    activity_dates: dict[int, date] | None = None,
+) -> tuple[int, list[str], str]:
     """
     Returns (score 0-100, reason strings, suggested action_type).
     """
@@ -36,7 +43,7 @@ def score_lead(db: Session, org_id: int, lead: Lead, *, today: date | None = Non
     if lead.oncelik == "yuksek":
         reasons.append("Öncelik: yüksek")
 
-    activity_dates = get_last_activity_dates(db, org_id, [lead.id])
+    activity_dates = activity_dates if activity_dates is not None else get_last_activity_dates(db, org_id, [lead.id])
     last_contact = get_last_contact_date(lead, activity_dates)
     if last_contact:
         days_idle = (today - last_contact).days
@@ -98,9 +105,12 @@ def rank_leads_for_org(db: Session, org_id: int, *, limit: int = 10) -> list[dic
     for row in db.query(CategoryModel).filter(CategoryModel.user_id == org_id).all():
         cat_map[row.id] = row.label
 
+    lead_ids = [lead.id for lead in leads]
+    activity_dates = get_last_activity_dates(db, org_id, lead_ids)
+
     scored: list[dict] = []
     for lead in leads:
-        score, reasons, action = score_lead(db, org_id, lead)
+        score, reasons, action = score_lead(db, org_id, lead, activity_dates=activity_dates)
         if score <= 0 or action == "none":
             continue
         scored.append(

@@ -46,12 +46,10 @@ def _lead_created_in_range(lead: Lead, start: date, end: date) -> bool:
 def _lead_became_customer_in_range(lead: Lead, start: date, end: date) -> bool:
     if lead.durum != "Müşteri":
         return False
-    if lead.updated_at:
-        updated = lead.updated_at.date()
-        if start <= updated <= end:
-            return True
-    sale_day = _sale_date(lead)
-    return bool(sale_day and start <= sale_day <= end)
+    sale_day = _parse_date(lead.satis_tarihi or "")
+    if sale_day:
+        return start <= sale_day <= end
+    return False
 
 
 def _sales_in_range(leads: list[Lead], start: date, end: date) -> list[Lead]:

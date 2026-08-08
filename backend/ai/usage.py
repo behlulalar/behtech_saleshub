@@ -5,6 +5,10 @@ from config import settings
 from database import AiUsageMonthly
 
 
+class QuotaExceededError(Exception):
+    """Worker-safe quota failure (no HTTPException)."""
+
+
 def current_usage_month() -> str:
     return local_today().strftime("%Y-%m")
 
@@ -38,22 +42,24 @@ def usage_summary(db: Session, org_id: int) -> dict:
     }
 
 
-def ensure_quota(db: Session, org_id: int, estimated_tokens: int = 0) -> None:
+def assert_quota_available(db: Session, org_id: int, *, estimated_tokens: int = 0) -> None:
     summary = usage_summary(db, org_id)
     if summary["tokens_remaining"] <= 0:
-        from fastapi import HTTPException, status
-
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Aylık AI token limiti doldu",
-        )
+        raise QuotaExceededError("Aylık AI token limiti doldu")
     if estimated_tokens and summary["tokens_remaining"] < estimated_tokens:
+        raise QuotaExceededError("Bu istek için yeterli AI kotası yok")
+
+
+def ensure_quota(db: Session, org_id: int, estimated_tokens: int = 0) -> None:
+    try:
+        assert_quota_available(db, org_id, estimated_tokens=estimated_tokens)
+    except QuotaExceededError as exc:
         from fastapi import HTTPException, status
 
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Bu istek için yeterli AI kotası yok",
-        )
+            detail=str(exc),
+        ) from exc
 
 
 def record_usage(db: Session, org_id: int, tokens: int) -> None:

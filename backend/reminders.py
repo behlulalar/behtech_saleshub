@@ -50,9 +50,6 @@ def get_last_contact_date(lead: Lead, activity_dates: dict[int, date]) -> date |
     if lead.id in activity_dates:
         candidates.append(activity_dates[lead.id])
 
-    if lead.updated_at:
-        candidates.append(lead.updated_at.date())
-
     if not candidates and lead.created_at:
         candidates.append(lead.created_at.date())
 
