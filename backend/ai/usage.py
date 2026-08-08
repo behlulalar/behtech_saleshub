@@ -62,7 +62,16 @@ def ensure_quota(db: Session, org_id: int, estimated_tokens: int = 0) -> None:
         ) from exc
 
 
-def record_usage(db: Session, org_id: int, tokens: int) -> None:
+def record_token_usage(db: Session, org_id: int, tokens: int) -> None:
     row = get_monthly_usage(db, org_id)
     row.tokens_total = (row.tokens_total or 0) + max(0, tokens)
+
+
+def record_ai_request(db: Session, org_id: int) -> None:
+    row = get_monthly_usage(db, org_id)
     row.request_count = (row.request_count or 0) + 1
+
+
+def record_usage(db: Session, org_id: int, tokens: int) -> None:
+    record_token_usage(db, org_id, tokens)
+    record_ai_request(db, org_id)

@@ -10,7 +10,12 @@ from ai.llm_client import AiNotConfiguredError, assert_llm_configured, chat_comp
 from ai.run_log_redact import redact_run_step
 from ai.store import append_run_step
 from ai.tools import TOOL_REGISTRY, execute_tool
-from ai.usage import QuotaExceededError, assert_quota_available, record_usage
+from ai.usage import (
+    QuotaExceededError,
+    assert_quota_available,
+    record_ai_request,
+    record_token_usage,
+)
 from config import settings
 from database import AiRun, User
 
@@ -60,6 +65,7 @@ def run_agent_query(
     assert_llm_configured()
     per_step = _estimated_tokens_per_step()
     assert_quota_available(db, org_id, estimated_tokens=per_step)
+    record_ai_request(db, org_id)
 
     started = time.perf_counter()
     tool_names = ", ".join(TOOL_REGISTRY.keys())
@@ -92,7 +98,7 @@ def run_agent_query(
         total_prompt += p
         total_completion += c
         total_tokens += step_tokens
-        record_usage(db, org_id, step_tokens)
+        record_token_usage(db, org_id, step_tokens)
 
         append_run_step(
             db,
