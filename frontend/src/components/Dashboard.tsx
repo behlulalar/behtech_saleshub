@@ -5,6 +5,8 @@ import {
   CalendarClock,
   CheckCircle,
   Bell,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Edit2,
   LayoutDashboard,
@@ -468,44 +470,69 @@ function ReminderList({
   lastLabel: string;
   editTitle: string;
 }) {
+  const [open, setOpen] = useState(true);
+
   return (
     <div className="card overflow-hidden border-orange-200">
-      <div className="flex items-center gap-2 border-b border-orange-100 bg-orange-50 px-3 py-2.5 lg:px-4 lg:py-3">
-        <Icon size={16} className="text-orange-600" />
-        <h3 className="text-xs font-semibold text-orange-900 lg:text-sm">{title}</h3>
-        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-          {items.length}
-        </span>
-        <span className="ml-auto text-xs text-orange-700/70">
-          {thresholdDays}+ {daysNoResponseLabel}
-        </span>
+      <div className="border-b border-orange-100 bg-orange-50 px-3 py-2 lg:px-4 lg:py-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-2 rounded-lg text-left transition hover:bg-orange-100/50 lg:gap-2.5"
+          aria-expanded={open}
+        >
+          <Icon size={16} className="shrink-0 text-orange-600" />
+          <h3 className="min-w-0 flex-1 text-xs font-semibold text-orange-900 lg:text-sm">{title}</h3>
+          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium tabular-nums text-orange-700">
+            {items.length}
+          </span>
+          <span className="hidden text-xs text-orange-700/70 sm:inline">
+            {thresholdDays}+ {daysNoResponseLabel}
+          </span>
+          <span className="shrink-0 text-orange-700/50" aria-hidden>
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </span>
+        </button>
+        {!open ? (
+          <p className="mt-1 pl-6 text-[11px] text-orange-700/65 sm:hidden">
+            {thresholdDays}+ {daysNoResponseLabel}
+          </p>
+        ) : null}
       </div>
-      <div className="divide-y divide-surface-100">
-        {items.map((item) => (
-          <div
-            key={`${item.id}-${item.last_contact_date}`}
-            className="flex items-center gap-2 px-3.5 py-2.5 transition hover:bg-orange-50/40 lg:px-4 lg:py-3"
-          >
-            <button
-              onClick={() => onSelect(item.category)}
-              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      {open ? (
+        <div className="divide-y divide-surface-100">
+          {items.map((item) => (
+            <div
+              key={`${item.id}-${item.last_contact_date}`}
+              className="flex items-center gap-2 px-3 py-2 transition hover:bg-orange-50/40 sm:px-4"
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-surface-900">{item.isletme_adi}</p>
-                <p className="text-xs text-surface-800/50">
-                  {item.category_label}{item.detail ? ` · ${item.detail}` : ''}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold text-orange-600">{item.days_waiting} {daysLabel}</p>
-                <p className="text-xs text-surface-800/50">{lastLabel}: {item.last_contact_date}</p>
-                <StatusBadge durum={item.durum} size="xs" />
-              </div>
-            </button>
-            <EditButton onClick={() => onEdit(item.id)} title={editTitle} />
-          </div>
-        ))}
-      </div>
+              <button
+                type="button"
+                onClick={() => onSelect(item.category)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-surface-900">{item.isletme_adi}</p>
+                  <p className="truncate text-xs text-surface-800/50">
+                    {item.category_label}
+                    {item.detail ? ` · ${item.detail}` : ''}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs font-semibold tabular-nums text-orange-600 sm:text-sm">
+                    {item.days_waiting} {daysLabel}
+                  </p>
+                  <p className="hidden text-[11px] text-surface-800/50 sm:block">
+                    {lastLabel}: {item.last_contact_date}
+                  </p>
+                  <StatusBadge durum={item.durum} size="xs" />
+                </div>
+              </button>
+              <EditButton onClick={() => onEdit(item.id)} title={editTitle} />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
