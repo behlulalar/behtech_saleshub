@@ -19,7 +19,12 @@ import LeadImportModal from './components/LeadImportModal';
 import LeadDiscoveryModal from './components/LeadDiscoveryModal';
 import AiChatWidget from './components/ai/AiChatWidget';
 import LeadTable from './components/LeadTable';
-import QuickTaskForm, { quickTaskToLeadData, type QuickTaskData, type TaskType } from './components/QuickTaskForm';
+import QuickTaskForm, {
+  applyQuickTaskToExistingLead,
+  quickTaskToLeadData,
+  type QuickTaskData,
+  type TaskType,
+} from './components/QuickTaskForm';
 import EmployeeManager from './components/EmployeeManager';
 import AccountSettings from './components/AccountSettings';
 import RequestForm from './components/RequestForm';
@@ -629,7 +634,12 @@ function App() {
   };
 
   const handleSaveQuickTask = async (task: QuickTaskData) => {
-    await api.createLead(task.category, quickTaskToLeadData(task));
+    if (task.lead_id) {
+      const existing = await api.getLead(task.lead_id);
+      await api.updateLead(task.lead_id, applyQuickTaskToExistingLead(existing, task));
+    } else {
+      await api.createLead(task.category, quickTaskToLeadData(task));
+    }
     await refreshAfterLeadChange();
   };
 

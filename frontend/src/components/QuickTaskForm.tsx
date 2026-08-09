@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Clock, Save, X } from 'lucide-react';
-import type { Category } from '../types';
+import { api } from '../api';
+import type { Category, Lead, LeadFormData } from '../types';
 import { EMPTY_LEAD } from '../types';
 import StatusSelect from './StatusSelect';
 
@@ -8,6 +9,7 @@ export type TaskType = 'gorusme' | 'demo' | 'takip';
 
 export interface QuickTaskData {
   category: string;
+  lead_id?: number;
   isletme_adi: string;
   gorev_tipi: TaskType;
   tarih: string;
@@ -34,6 +36,26 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+async function fetchLeadsForCategory(category: string): Promise<Lead[]> {
+  const pageSize = 200;
+  const first = await api.getLeads(category, undefined, undefined, undefined, undefined, undefined, 1, pageSize);
+  const items = [...first.items];
+  for (let page = 2; page <= first.total_pages; page += 1) {
+    const next = await api.getLeads(
+      category,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      page,
+      pageSize,
+    );
+    items.push(...next.items);
+  }
+  return items.sort((a, b) => a.isletme_adi.localeCompare(b.isletme_adi, 'tr'));
+}
+
 export default function QuickTaskForm({
   categories,
   onSave,
@@ -52,12 +74,69 @@ export default function QuickTaskForm({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [categoryLeads, setCategoryLeads] = useState<Lead[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<number | ''>('');
 
   useEffect(() => {
     if (categories.length && !form.category) {
       setForm((f) => ({ ...f, category: categories[0].id }));
     }
   }, [categories, form.category]);
+
+  useEffect(() => {
+    if (!form.category) {
+      setCategoryLeads([]);
+      setSelectedLeadId('');
+      return;
+    }
+
+    let cancelled = false;
+    setLeadsLoading(true);
+    setSelectedLeadId('');
+    setForm((f) => ({ ...f, isletme_adi: '', lead_id: undefined }));
+
+    fetchLeadsForCategory(form.category)
+      .then((leads) => {
+        if (cancelled) return;
+        setCategoryLeads(leads);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryLeads([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLeadsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.category]);
+
+  const hasRegisteredLeads = categoryLeads.length > 0;
+
+  const leadOptions = useMemo(
+    () => categoryLeads.map((l) => ({ id: l.id, name: l.isletme_adi })),
+    [categoryLeads],
+  );
+
+  const handleCategoryChange = (category: string) => {
+    setForm((f) => ({ ...f, category, isletme_adi: '', lead_id: undefined }));
+    setSelectedLeadId('');
+  };
+
+  const handleLeadSelect = (value: string) => {
+    if (value === '') {
+      setSelectedLeadId('');
+      setForm((f) => ({ ...f, isletme_adi: '', lead_id: undefined }));
+      return;
+    }
+    const id = Number(value);
+    const lead = categoryLeads.find((l) => l.id === id);
+    if (!lead) return;
+    setSelectedLeadId(id);
+    setForm((f) => ({ ...f, isletme_adi: lead.isletme_adi, lead_id: lead.id }));
+  };
 
   const handleTypeChange = (type: TaskType) => {
     setForm((f) => ({ ...f, gorev_tipi: type, durum: TASK_DEFAULTS[type].durum }));
@@ -66,7 +145,11 @@ export default function QuickTaskForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.isletme_adi.trim()) {
-      setError('İşletme adı zorunludur.');
+      setError(hasRegisteredLeads ? 'Kayıtlı bir işletme seçin.' : 'İşletme adı zorunludur.');
+      return;
+    }
+    if (hasRegisteredLeads && !form.lead_id) {
+      setError('Kayıtlı bir işletme seçin.');
       return;
     }
     if (!form.category) {
@@ -110,7 +193,7 @@ export default function QuickTaskForm({
             <select
               className="input-field"
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               required
             >
               {categories.map((c) => (
@@ -121,13 +204,36 @@ export default function QuickTaskForm({
 
           <div>
             <label className="label-field">İşletme Adı *</label>
-            <input
-              className="input-field"
-              value={form.isletme_adi}
-              onChange={(e) => setForm({ ...form, isletme_adi: e.target.value })}
-              placeholder="Salon veya işletme adı"
-              required
-            />
+            {leadsLoading ? (
+              <p className="text-sm text-surface-800/50">İşletmeler yükleniyor…</p>
+            ) : hasRegisteredLeads ? (
+              <select
+                className="input-field"
+                value={selectedLeadId === '' ? '' : String(selectedLeadId)}
+                onChange={(e) => handleLeadSelect(e.target.value)}
+                required
+              >
+                <option value="">İşletme seçin</option>
+                {leadOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  className="input-field"
+                  value={form.isletme_adi}
+                  onChange={(e) => setForm({ ...form, isletme_adi: e.target.value, lead_id: undefined })}
+                  placeholder="Salon veya işletme adı"
+                  required
+                />
+                <p className="mt-1 text-xs text-surface-800/50">
+                  Bu kategoride kayıtlı işletme yok; yeni kayıt oluşturulur.
+                </p>
+              </>
+            )}
           </div>
 
           <div>
@@ -220,4 +326,40 @@ export function quickTaskToLeadData(task: QuickTaskData) {
     return { ...base, demo_gonderildi: true, demo_tarihi: task.tarih };
   }
   return { ...base, takip_1: task.tarih + (task.notlar ? ` - ${task.notlar}` : '') };
+}
+
+export function applyQuickTaskToExistingLead(lead: Lead, task: QuickTaskData): LeadFormData {
+  const {
+    id: _id,
+    category: _cat,
+    created_at: _ca,
+    updated_at: _ua,
+    tags,
+    ...rest
+  } = lead;
+
+  const base = {
+    ...rest,
+    oncelik: rest.oncelik || 'orta',
+    satis_tutari: rest.satis_tutari || 0,
+    satis_tarihi: rest.satis_tarihi || '',
+    tag_ids: tags?.map((t) => t.id) || [],
+    demo_gonderildi: rest.demo_gonderildi || rest.durum === 'Demo Gönderildi',
+    isletme_adi: task.isletme_adi.trim(),
+    durum: task.durum,
+    notlar: task.notlar.trim() ? task.notlar.trim() : rest.notlar,
+  };
+
+  if (task.gorev_tipi === 'gorusme') {
+    return { ...base, gorusme_tarihi: task.tarih, gorusme_saati: task.saat };
+  }
+  if (task.gorev_tipi === 'demo') {
+    return {
+      ...base,
+      demo_gonderildi: true,
+      demo_tarihi: task.tarih,
+    };
+  }
+  const takipNote = task.notlar ? ` - ${task.notlar}` : '';
+  return { ...base, takip_1: task.tarih + takipNote };
 }
