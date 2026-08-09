@@ -169,7 +169,7 @@ def test_chat_completion_structured_uses_json_mode_and_diagnosis_temperature(mon
 
     fake_usage = MagicMock(prompt_tokens=11, completion_tokens=22, total_tokens=33)
     fake_message = MagicMock(content='{"summary":"ok","why_it_matters":"ok","key_findings":[],"recommended_actions":[],"confidence":"low"}')
-    fake_choice = MagicMock(message=fake_message)
+    fake_choice = MagicMock(message=fake_message, finish_reason="stop")
     fake_response = MagicMock(choices=[fake_choice], usage=fake_usage)
 
     mock_client = MagicMock()
@@ -182,6 +182,7 @@ def test_chat_completion_structured_uses_json_mode_and_diagnosis_temperature(mon
 
     assert '"summary"' in text
     assert usage["total_tokens"] == 33
+    assert usage.get("finish_reason") == "stop"
     kwargs = mock_client.chat.completions.create.call_args.kwargs
     assert kwargs["response_format"] == {"type": "json_object"}
     assert kwargs["temperature"] == settings.ai_diagnosis_interpret_temperature
@@ -307,6 +308,16 @@ def _valid_interpretation_json() -> str:
     )
 
 
+def _de3_fake_run(run_id: int = 99):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=run_id, steps_json="[]")
+
+
+def _steps_from_run(run) -> list:
+    return json.loads(run.steps_json or "[]")
+
+
 def _compute_payload() -> dict:
     return {
         "generated_at": "2026-08-09T12:00:00+03:00",
@@ -350,8 +361,7 @@ def test_run_diagnosis_interpret_success(monkeypatch):
     db = MagicMock()
     user = MagicMock()
     user.id = 7
-    fake_run = MagicMock()
-    fake_run.id = 99
+    fake_run = _de3_fake_run(99)
 
     with patch(
         "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
@@ -434,7 +444,7 @@ def test_run_diagnosis_interpret_refresh_bypasses_cache(monkeypatch):
 
     db = MagicMock()
     user = MagicMock(id=1)
-    fake_run = MagicMock(id=88)
+    fake_run = _de3_fake_run(88)
 
     with patch(
         "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
@@ -473,7 +483,7 @@ def test_run_diagnosis_interpret_invalid_json_fallback(monkeypatch):
 
     db = MagicMock()
     user = MagicMock(id=1)
-    fake_run = MagicMock(id=77)
+    fake_run = _de3_fake_run(77)
 
     with patch(
         "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
@@ -485,18 +495,23 @@ def test_run_diagnosis_interpret_invalid_json_fallback(monkeypatch):
         ):
             with patch("ai.capabilities.diagnosis_interpreter.ensure_quota"):
                 with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=fake_run):
-                    with patch("ai.capabilities.diagnosis_interpreter.finish_run_failed") as mock_fail:
-                        with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
-                            result = run_diagnosis_interpret(
-                                db,
-                                user=user,
-                                org_id=1,
-                                diagnosis_id="follow_up_idle_leads",
-                            )
+                    with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
+                        result = run_diagnosis_interpret(
+                            db,
+                            user=user,
+                            org_id=1,
+                            diagnosis_id="follow_up_idle_leads",
+                        )
 
     assert result["interpretation"] is None
     assert result["error_code"] == "invalid_llm_output"
-    mock_fail.assert_called_once()
+    steps = _steps_from_run(fake_run)
+    events = [s.get("event") for s in steps]
+    assert events.count("llm_attempt") == 2
+    assert "repair_attempt" in events
+    assert events.count("parse_failed") == 2
+    assert "parse_success" not in events
+    assert fake_run.tokens_total == 10
 
 
 def test_cache_identity_match_all_fields():
@@ -638,7 +653,7 @@ def test_run_diagnosis_interpret_repair_token_aggregation(monkeypatch):
 
     db = MagicMock()
     user = MagicMock(id=1)
-    fake_run = MagicMock(id=42)
+    fake_run = _de3_fake_run(42)
 
     usage1 = {"prompt_tokens": 800, "completion_tokens": 200, "total_tokens": 1000}
     usage2 = {"prompt_tokens": 700, "completion_tokens": 150, "total_tokens": 850}
@@ -698,7 +713,7 @@ def test_run_diagnosis_interpret_invalid_cached_output_soft_miss(monkeypatch):
 
     db = MagicMock()
     user = MagicMock(id=1)
-    fake_run = MagicMock(id=99)
+    fake_run = _de3_fake_run(99)
 
     with patch(
         "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
@@ -731,9 +746,13 @@ def test_run_diagnosis_interpret_invalid_cached_output_soft_miss(monkeypatch):
                                         diagnosis_id="follow_up_idle_leads",
                                     )
 
-    mock_step.assert_called_once()
-    step = mock_step.call_args[0][2]
-    assert step["reason"] == "invalid_cached_output"
+    mock_step.assert_called()
+    cache_steps = [
+        call[0][2]
+        for call in mock_step.call_args_list
+        if call[0][2].get("reason") == "invalid_cached_output"
+    ]
+    assert len(cache_steps) == 1
     db.commit.assert_called()
 
 
@@ -749,7 +768,7 @@ def test_run_diagnosis_interpret_llm_exception(monkeypatch):
 
     db = MagicMock()
     user = MagicMock(id=1)
-    fake_run = MagicMock(id=66)
+    fake_run = _de3_fake_run(66)
 
     with patch(
         "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
@@ -1207,7 +1226,7 @@ def test_run_diagnosis_interpret_forwards_org_id_to_compute_diagnoses(monkeypatc
                     "ai.capabilities.diagnosis_interpreter.chat_completion_structured",
                     return_value=(_valid_interpretation_json(), {"total_tokens": 1}),
                 ):
-                    with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=MagicMock(id=1)):
+                    with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=_de3_fake_run(1)):
                         with patch("ai.capabilities.diagnosis_interpreter.finish_run_success"):
                             with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
                                 run_diagnosis_interpret(
@@ -1389,4 +1408,295 @@ def test_diagnosis_interpret_api_org_isolation(api_client):
         settings.ai_diagnosis_interpret_enabled = prev_flag
         settings.ai_enabled = prev_ai
         app.dependency_overrides.clear()
+
+
+# --- DE-3 Stage 10C: observability & reliability ---
+
+
+def test_de3_classify_empty_output():
+    from ai.capabilities.diagnosis_interpret_parse import classify_parse_failure
+
+    meta = classify_parse_failure("   ")
+    assert meta["reason"] == "empty_output"
+
+
+def test_de3_classify_invalid_json():
+    from ai.capabilities.diagnosis_interpret_parse import classify_parse_failure
+
+    meta = classify_parse_failure("not-json")
+    assert meta["reason"] == "invalid_json"
+
+
+def test_de3_classify_invalid_enum():
+    from ai.capabilities.diagnosis_interpret_parse import classify_parse_failure
+
+    payload = json.loads(_valid_interpretation_json())
+    payload["confidence"] = "very_high"
+    meta = classify_parse_failure(json.dumps(payload))
+    assert meta["reason"] == "invalid_enum"
+    assert meta["validation_path"] == "confidence"
+
+
+def test_de3_classify_missing_required_field():
+    from ai.capabilities.diagnosis_interpret_parse import classify_parse_failure
+
+    meta = classify_parse_failure(
+        '{"why_it_matters":"x","key_findings":[],"recommended_actions":[],"confidence":"low"}'
+    )
+    assert meta["reason"] == "missing_required_field"
+    assert meta["validation_path"] == "summary"
+
+
+def test_de3_classify_malformed_truncated_json():
+    from ai.capabilities.diagnosis_interpret_parse import classify_parse_failure
+
+    meta = classify_parse_failure('{"summary": "x", "why_it_matters": "y"')
+    assert meta["reason"] in ("malformed_structure", "invalid_json")
+
+
+def test_de3_success_first_attempt_telemetry(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.capabilities.diagnosis_interpreter import run_diagnosis_interpret
+
+    monkeypatch.setattr("config.settings.diagnosis_engine_enabled", True)
+    monkeypatch.setattr("config.settings.ai_diagnosis_interpret_enabled", True)
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+
+    fake_run = _de3_fake_run(101)
+    db = MagicMock()
+    user = MagicMock(id=1)
+
+    usage = {
+        "prompt_tokens": 10,
+        "completion_tokens": 20,
+        "total_tokens": 30,
+        "finish_reason": "stop",
+    }
+    with patch(
+        "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
+        return_value=_compute_payload(),
+    ):
+        with patch("ai.capabilities.diagnosis_interpreter.ensure_quota"):
+            with patch(
+                "ai.capabilities.diagnosis_interpreter.chat_completion_structured",
+                return_value=(_valid_interpretation_json(), usage),
+            ):
+                with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=fake_run):
+                    with patch("ai.capabilities.diagnosis_interpreter.finish_run_success"):
+                        with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
+                            run_diagnosis_interpret(
+                                db,
+                                user=user,
+                                org_id=1,
+                                diagnosis_id="follow_up_idle_leads",
+                            )
+
+    steps = _steps_from_run(fake_run)
+    assert [s["event"] for s in steps] == ["llm_attempt", "parse_success"]
+    assert steps[0]["attempt"] == 1
+    assert steps[0]["finish_reason"] == "stop"
+    assert "repair_attempt" not in [s.get("event") for s in steps]
+
+
+def test_de3_repair_success_telemetry(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.capabilities.diagnosis_interpreter import run_diagnosis_interpret
+
+    monkeypatch.setattr("config.settings.diagnosis_engine_enabled", True)
+    monkeypatch.setattr("config.settings.ai_diagnosis_interpret_enabled", True)
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+
+    fake_run = _de3_fake_run(102)
+    db = MagicMock()
+    user = MagicMock(id=1)
+    usage1 = {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3, "finish_reason": "stop"}
+    usage2 = {"prompt_tokens": 4, "completion_tokens": 5, "total_tokens": 9, "finish_reason": "length"}
+
+    with patch(
+        "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
+        return_value=_compute_payload(),
+    ):
+        with patch("ai.capabilities.diagnosis_interpreter.ensure_quota"):
+            with patch(
+                "ai.capabilities.diagnosis_interpreter.chat_completion_structured",
+                side_effect=[("bad", usage1), (_valid_interpretation_json(), usage2)],
+            ):
+                with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=fake_run):
+                    with patch("ai.capabilities.diagnosis_interpreter.finish_run_success"):
+                        with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
+                            run_diagnosis_interpret(
+                                db,
+                                user=user,
+                                org_id=1,
+                                diagnosis_id="follow_up_idle_leads",
+                            )
+
+    steps = _steps_from_run(fake_run)
+    events = [s["event"] for s in steps]
+    assert events == [
+        "llm_attempt",
+        "parse_failed",
+        "repair_attempt",
+        "llm_attempt",
+        "parse_success",
+    ]
+    assert steps[1]["reason"] == "invalid_json"
+    assert steps[4]["attempt"] == 2
+    assert steps[3]["finish_reason"] == "length"
+
+
+def test_de3_failed_repair_aggregate_tokens_on_airun(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.capabilities.diagnosis_interpreter import run_diagnosis_interpret
+
+    monkeypatch.setattr("config.settings.diagnosis_engine_enabled", True)
+    monkeypatch.setattr("config.settings.ai_diagnosis_interpret_enabled", True)
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+
+    fake_run = _de3_fake_run(103)
+    db = MagicMock()
+    user = MagicMock(id=1)
+    usage1 = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+    usage2 = {"prompt_tokens": 200, "completion_tokens": 80, "total_tokens": 280}
+    recorded: list[int] = []
+
+    with patch(
+        "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
+        return_value=_compute_payload(),
+    ):
+        with patch("ai.capabilities.diagnosis_interpreter.ensure_quota"):
+            with patch(
+                "ai.capabilities.diagnosis_interpreter.chat_completion_structured",
+                side_effect=[("bad", usage1), ("still-bad", usage2)],
+            ):
+                with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=fake_run):
+                    with patch(
+                        "ai.capabilities.diagnosis_interpreter.record_usage",
+                        side_effect=lambda _db, _org, tok: recorded.append(tok),
+                    ):
+                        result = run_diagnosis_interpret(
+                            db,
+                            user=user,
+                            org_id=1,
+                            diagnosis_id="follow_up_idle_leads",
+                        )
+
+    assert result["error_code"] == "invalid_llm_output"
+    assert fake_run.tokens_prompt == 300
+    assert fake_run.tokens_completion == 130
+    assert fake_run.tokens_total == 430
+    assert recorded == [430]
+
+
+def test_de3_telemetry_does_not_persist_raw_or_pii(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.capabilities.diagnosis_interpreter import run_diagnosis_interpret
+
+    monkeypatch.setattr("config.settings.diagnosis_engine_enabled", True)
+    monkeypatch.setattr("config.settings.ai_diagnosis_interpret_enabled", True)
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+
+    fake_run = _de3_fake_run(104)
+    db = MagicMock()
+    user = MagicMock(id=1)
+    leaky = "SECRET_LEAD_NAME_XYZ not-json-tail"
+    with patch(
+        "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
+        return_value=_compute_payload(),
+    ):
+        with patch("ai.capabilities.diagnosis_interpreter.ensure_quota"):
+            with patch(
+                "ai.capabilities.diagnosis_interpreter.chat_completion_structured",
+                side_effect=[
+                    (leaky, {"total_tokens": 1}),
+                    (leaky, {"total_tokens": 1}),
+                ],
+            ):
+                with patch("ai.capabilities.diagnosis_interpreter.create_run", return_value=fake_run):
+                    with patch("ai.capabilities.diagnosis_interpreter.record_usage"):
+                        run_diagnosis_interpret(
+                            db,
+                            user=user,
+                            org_id=1,
+                            diagnosis_id="follow_up_idle_leads",
+                        )
+
+    blob = fake_run.steps_json
+    assert "SECRET_LEAD_NAME_XYZ" not in blob
+    assert "Test Kuaför" not in blob
+
+
+def test_de3_cache_hit_no_llm_telemetry_events(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.capabilities.diagnosis_interpreter import run_diagnosis_interpret
+
+    monkeypatch.setattr("config.settings.diagnosis_engine_enabled", True)
+    monkeypatch.setattr("config.settings.ai_diagnosis_interpret_enabled", True)
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+
+    cached_run = MagicMock()
+    cached_run.id = 9
+    cached_run.steps_json = "[]"
+    cached_run.output_json = json.dumps(
+        {"interpretation": json.loads(_valid_interpretation_json())},
+        ensure_ascii=False,
+    )
+
+    with patch(
+        "ai.capabilities.diagnosis_interpreter.compute_diagnoses",
+        return_value=_compute_payload(),
+    ):
+        with patch(
+            "ai.capabilities.diagnosis_interpreter._find_cached_run",
+            return_value=cached_run,
+        ):
+            with patch("ai.capabilities.diagnosis_interpreter.chat_completion_structured") as mock_llm:
+                result = run_diagnosis_interpret(
+                    MagicMock(),
+                    user=MagicMock(id=1),
+                    org_id=1,
+                    diagnosis_id="follow_up_idle_leads",
+                )
+
+    assert result["cached"] is True
+    mock_llm.assert_not_called()
+    assert _steps_from_run(cached_run) == []
+
+
+def test_de3_structured_request_max_tokens_450_unchanged(monkeypatch):
+    from unittest.mock import MagicMock, patch
+
+    from ai.llm_client import chat_completion_structured
+
+    monkeypatch.setattr("config.settings.ai_enabled", True)
+    monkeypatch.setattr("config.settings.openai_api_key", "sk-test")
+    assert settings.ai_diagnosis_interpret_max_output_tokens == 450
+    assert settings.ai_diagnosis_interpret_temperature == 0.2
+
+    fake_usage = MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+    fake_message = MagicMock(
+        content='{"summary":"a","why_it_matters":"b","key_findings":[],"recommended_actions":[],"confidence":"low"}'
+    )
+    fake_choice = MagicMock(message=fake_message, finish_reason="stop")
+    fake_response = MagicMock(choices=[fake_choice], usage=fake_usage)
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = fake_response
+
+    with patch("ai.llm_client._openai_direct_client", return_value=mock_client):
+        chat_completion_structured(system="s", user="u")
+
+    kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert kwargs["max_tokens"] == 450
+    assert kwargs["response_format"] == {"type": "json_object"}
+    assert kwargs["temperature"] == 0.2
 

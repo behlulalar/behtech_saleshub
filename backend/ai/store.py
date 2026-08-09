@@ -104,11 +104,17 @@ def finish_run_failed(
     error_code: str,
     duration_ms: int | None = None,
     output_data: dict | None = None,
+    tokens_prompt: int | None = None,
+    tokens_completion: int | None = None,
+    tokens_total: int | None = None,
 ) -> None:
     run.status = "failed"
     run.error_code = error_code
     run.duration_ms = duration_ms
     run.output_json = _dump(output_data or {})
+    run.tokens_prompt = tokens_prompt
+    run.tokens_completion = tokens_completion
+    run.tokens_total = tokens_total
     run.updated_at = datetime.utcnow()
 
 

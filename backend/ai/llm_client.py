@@ -227,5 +227,8 @@ def chat_completion_structured(
         "response_format": {"type": "json_object"},
     }
     response = client.chat.completions.create(**create_kwargs)
-    choice = response.choices[0].message.content or ""
-    return strip_llm_json_content(choice), _usage_from_response(response)
+    choice_obj = response.choices[0]
+    choice = choice_obj.message.content or ""
+    usage = _usage_from_response(response)
+    usage["finish_reason"] = getattr(choice_obj, "finish_reason", None)
+    return strip_llm_json_content(choice), usage

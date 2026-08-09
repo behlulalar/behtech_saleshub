@@ -28,6 +28,7 @@ from database import AiRun, User
 from intelligence.diagnosis.engine import compute_diagnoses
 from reports import parse_report_anchor
 from schemas import DiagnosisInterpretation
+from ai.capabilities.diagnosis_interpret_parse import try_parse_interpretation
 
 RUN_TYPE = "diagnosis_interpret"
 DISCLAIMER = "AI yorumu — karar vermeden önce teşhis verilerini kontrol edin."
@@ -146,11 +147,49 @@ def _interpretation_from_run(run: AiRun) -> DiagnosisInterpretation | None:
         return None
 
 
-def _parse_interpretation(raw: str) -> DiagnosisInterpretation | None:
-    try:
-        return DiagnosisInterpretation.model_validate_json(raw)
-    except (ValidationError, json.JSONDecodeError, ValueError):
-        return None
+def _append_llm_attempt_step(
+    db: Session,
+    run: AiRun,
+    *,
+    attempt: int,
+    provider: str,
+    model: str,
+    usage: dict,
+) -> None:
+    append_run_step(
+        db,
+        run,
+        {
+            "event": "llm_attempt",
+            "attempt": attempt,
+            "provider": provider,
+            "model": model,
+            "finish_reason": usage.get("finish_reason"),
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "completion_tokens": usage.get("completion_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+        },
+    )
+
+
+def _append_parse_failed_step(
+    db: Session,
+    run: AiRun,
+    *,
+    attempt: int,
+    failure_meta: dict | None,
+) -> None:
+    meta = failure_meta or {"reason": "unknown", "validation_path": None}
+    append_run_step(
+        db,
+        run,
+        {
+            "event": "parse_failed",
+            "attempt": attempt,
+            "reason": meta.get("reason") or "unknown",
+            "validation_path": meta.get("validation_path"),
+        },
+    )
 
 
 def _call_llm(system: str, user: str) -> tuple[str, dict]:
@@ -259,8 +298,15 @@ def run_diagnosis_interpret(
     try:
         raw, usage = _call_llm(system, user_msg)
         usage_agg = _merge_usage_totals(usage_agg, usage)
-        interpretation = _parse_interpretation(raw)
-        if interpretation is None:
+        _append_llm_attempt_step(
+            db, run, attempt=1, provider=provider, model=model, usage=usage
+        )
+        interpretation, failure_meta = try_parse_interpretation(raw)
+        if interpretation is not None:
+            append_run_step(db, run, {"event": "parse_success", "attempt": 1})
+        else:
+            _append_parse_failed_step(db, run, attempt=1, failure_meta=failure_meta)
+            append_run_step(db, run, {"event": "repair_attempt", "attempt": 2})
             repair_user = (
                 "Önceki geçersiz JSON çıktı:\n"
                 f"{raw[:2000]}\n\n"
@@ -269,12 +315,26 @@ def run_diagnosis_interpret(
             )
             raw2, usage2 = _call_llm(system, repair_user)
             usage_agg = _merge_usage_totals(usage_agg, usage2)
-            interpretation = _parse_interpretation(raw2)
-        if interpretation is None:
-            error_code = "invalid_llm_output"
+            _append_llm_attempt_step(
+                db, run, attempt=2, provider=provider, model=model, usage=usage2
+            )
+            interpretation, failure_meta2 = try_parse_interpretation(raw2)
+            if interpretation is not None:
+                append_run_step(db, run, {"event": "parse_success", "attempt": 2})
+            else:
+                _append_parse_failed_step(db, run, attempt=2, failure_meta=failure_meta2)
+                error_code = "invalid_llm_output"
     except Exception:
         duration_ms = int((time.perf_counter() - started) * 1000)
-        finish_run_failed(db, run, error_code="provider", duration_ms=duration_ms)
+        finish_run_failed(
+            db,
+            run,
+            error_code="provider",
+            duration_ms=duration_ms,
+            tokens_prompt=int(usage_agg.get("prompt_tokens") or 0) or None,
+            tokens_completion=int(usage_agg.get("completion_tokens") or 0) or None,
+            tokens_total=int(usage_agg.get("total_tokens") or 0) or None,
+        )
         db.commit()
         raise
 
@@ -287,6 +347,9 @@ def run_diagnosis_interpret(
             error_code=error_code or "invalid_llm_output",
             duration_ms=duration_ms,
             output_data={"interpretation": None},
+            tokens_prompt=int(usage_agg.get("prompt_tokens") or 0) or None,
+            tokens_completion=int(usage_agg.get("completion_tokens") or 0) or None,
+            tokens_total=tokens_total or None,
         )
         record_usage(db, org_id, tokens_total)
         db.commit()
