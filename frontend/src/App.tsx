@@ -12,6 +12,7 @@ import VerifyEmail from './components/VerifyEmail';
 import CategoryManager from './components/CategoryManager';
 import TagManager from './components/TagManager';
 import Dashboard from './components/Dashboard';
+import IntelligencePage from './components/IntelligencePage';
 import LeadDetail from './components/LeadDetail';
 import LeadForm from './components/LeadForm';
 import LeadImportModal from './components/LeadImportModal';
@@ -57,6 +58,7 @@ import type {
   RevenueData,
   ReportData,
   ReportPeriod,
+  IntelligenceView,
   Stats,
   Tag,
   TagFormData,
@@ -64,11 +66,15 @@ import type {
   UserProfile,
   UserRole,
 } from './types';
-import { ANALYTICS_VIEWS } from './types';
+import { ANALYTICS_VIEWS, INTELLIGENCE_VIEWS } from './types';
 import { getPublicRoute, navigateTo, type PublicRoute } from './utils/navigation';
 
 function isAnalyticsView(view: string): view is AnalyticsView {
   return ANALYTICS_VIEWS.includes(view as AnalyticsView);
+}
+
+function isIntelligenceView(view: string): view is IntelligenceView {
+  return INTELLIGENCE_VIEWS.includes(view as IntelligenceView);
 }
 
 function isCategoryView(view: string, categories: Category[]) {
@@ -325,6 +331,7 @@ function App() {
       || activeView === 'talepler'
       || activeView === 'raporlar'
       || isAnalyticsView(activeView)
+      || isIntelligenceView(activeView)
       || !isCategoryView(activeView, categories)
     ) {
       return;
@@ -514,7 +521,7 @@ function App() {
     if (editingLead) {
       await api.updateLead(editingLead.id, data);
     } else {
-      const category = formCategory || (activeView !== 'dashboard' && activeView !== 'gelir' && !isAnalyticsView(activeView) ? activeView : '');
+      const category = formCategory || (activeView !== 'dashboard' && activeView !== 'gelir' && !isAnalyticsView(activeView) && !isIntelligenceView(activeView) ? activeView : '');
       await api.createLead(category, data);
     }
     await refreshAfterLeadChange();
@@ -700,6 +707,15 @@ function App() {
     setSehirFilter('');
   };
 
+  const goToIntelligence = (view: IntelligenceView) => {
+    setActiveView(view);
+    setSearch('');
+    setDurumFilter('');
+    setTagFilter('');
+    setOncelikFilter('');
+    setSehirFilter('');
+  };
+
   if (verifyToken) {
     return (
       <>
@@ -784,6 +800,7 @@ function App() {
   const isRequests = activeView === 'talepler';
   const isReports = activeView === 'raporlar';
   const analyticsView = isAnalyticsView(activeView) ? activeView : null;
+  const intelligenceView = isIntelligenceView(activeView) ? activeView : null;
   const activeLabel = isDashboard
     ? app.views.dashboard.title
     : isRevenue
@@ -792,7 +809,9 @@ function App() {
         ? isOwner ? app.views.requests.title : app.views.myRequests.title
         : isReports
           ? app.views.reports.title
-          : analyticsView
+          : intelligenceView
+            ? app.views.intelligence[intelligenceView].title
+            : analyticsView
           ? app.views.analytics[analyticsView].title
           : categories.find((c) => c.id === activeView)?.label || (isOwner ? app.views.selectCategory : app.views.customers);
 
@@ -804,7 +823,9 @@ function App() {
         ? isOwner ? app.views.requests.description : app.views.myRequests.description
         : isReports
           ? app.views.reports.description
-          : analyticsView
+          : intelligenceView
+            ? app.views.intelligence[intelligenceView].description
+            : analyticsView
           ? app.views.analytics[analyticsView].description
           : isOwner
             ? app.views.categoryTracking
@@ -836,6 +857,7 @@ function App() {
         onSelectLeadDiscovery={isOwner ? () => setShowLeadDiscovery(true) : undefined}
         onSelectRequests={goToRequests}
         onSelectAnalytics={goToAnalytics}
+        onSelectIntelligence={goToIntelligence}
         onSelect={goToCategory}
         onManageCategories={() => setShowCategoryManager(true)}
         onManageTags={() => setShowTagManager(true)}
@@ -900,9 +922,15 @@ function App() {
               onAddCategory={() => setShowCategoryManager(true)}
               onEditLead={handleEditFromDashboard}
               onAddTask={handleAddTask}
-              isOwner={isOwner}
-              onDashboardRefresh={() => loadDashboard().catch(console.error)}
             />
+            </div>
+          ) : intelligenceView ? (
+            <div className="mobile-scroll-pane h-full lg:overflow-y-auto">
+              <IntelligencePage
+                view={intelligenceView}
+                isOwner={isOwner}
+                onEditLead={handleEditFromDashboard}
+              />
             </div>
           ) : isRequests ? (
             <RequestsPage

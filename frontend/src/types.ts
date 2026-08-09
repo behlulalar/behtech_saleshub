@@ -801,6 +801,19 @@ export const ANALYTICS_VIEWS: AnalyticsView[] = [
   'analiz-gunluk-iletisim',
 ];
 
+export type IntelligenceView =
+  | 'intel-overview'
+  | 'intel-diagnoses'
+  | 'intel-actions'
+  | 'intel-assistant';
+
+export const INTELLIGENCE_VIEWS: IntelligenceView[] = [
+  'intel-overview',
+  'intel-diagnoses',
+  'intel-actions',
+  'intel-assistant',
+];
+
 export interface DashboardData {
   toplam_kayit: number;
   aktif_takip: number;

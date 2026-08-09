@@ -1,4 +1,4 @@
-import type { AnalyticsView } from '../types';
+import type { AnalyticsView, IntelligenceView } from '../types';
 import type { LandingLocale } from './landing';
 
 export interface AppCopy {
@@ -10,6 +10,7 @@ export interface AppCopy {
     reports: string;
     leadDiscovery: string;
     analytics: string;
+    intelligence: string;
     categories: string;
     noCategoriesOwner: string;
     noCategoriesEmployee: string;
@@ -22,6 +23,7 @@ export interface AppCopy {
     expandSection: string;
     collapseSection: string;
     analyticsItems: Record<AnalyticsView, string>;
+    intelligenceItems: Record<IntelligenceView, string>;
   };
   header: {
     logout: string;
@@ -81,6 +83,7 @@ export interface AppCopy {
     categoryTracking: string;
     categoryReadOnly: string;
     analytics: Record<AnalyticsView, { title: string; description: string }>;
+    intelligence: Record<IntelligenceView, { title: string; description: string }>;
   };
   reports: {
     weekly: string;
@@ -510,6 +513,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       reports: 'Raporlama',
       leadDiscovery: 'Lead Keşfi',
       analytics: 'Analizler',
+      intelligence: 'Intelligence',
       categories: 'Kategoriler',
       noCategoriesOwner: 'Kategori eklemek için alttaki butonu kullanın.',
       noCategoriesEmployee: 'Henüz kategori yok.',
@@ -529,6 +533,12 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         'analiz-saat': 'Saat Analizi',
         'analiz-gun': 'Gün Analizi',
         'analiz-gunluk-iletisim': 'Günlük İletişim',
+      },
+      intelligenceItems: {
+        'intel-overview': 'Özet',
+        'intel-diagnoses': 'Teşhisler',
+        'intel-actions': 'Aksiyonlar',
+        'intel-assistant': 'Asistan',
       },
     },
     header: {
@@ -634,6 +644,24 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         'analiz-gunluk-iletisim': {
           title: 'Günlük İletişim Analizi',
           description: 'Seçilen günde kategori bazında iletişime geçilen kişi sayısı',
+        },
+      },
+      intelligence: {
+        'intel-overview': {
+          title: 'Intelligence · Özet',
+          description: 'Şirket KPI özeti ve bugün önce ara listesi',
+        },
+        'intel-diagnoses': {
+          title: 'Intelligence · Teşhisler',
+          description: 'Deterministik satış teşhisleri ve AI yorumu',
+        },
+        'intel-actions': {
+          title: 'Intelligence · Aksiyonlar',
+          description: 'DE-4 aksiyon önerileri ve onay kuyruğu',
+        },
+        'intel-assistant': {
+          title: 'Intelligence · Asistan',
+          description: 'Toplu skor güncelleme ve satış asistanı',
         },
       },
     },
@@ -1091,6 +1119,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       reports: 'Reports',
       leadDiscovery: 'Lead Discovery',
       analytics: 'Analytics',
+      intelligence: 'Intelligence',
       categories: 'Categories',
       noCategoriesOwner: 'Use the button below to add categories.',
       noCategoriesEmployee: 'No categories yet.',
@@ -1110,6 +1139,12 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         'analiz-saat': 'Hour Analysis',
         'analiz-gun': 'Day Analysis',
         'analiz-gunluk-iletisim': 'Daily Contact',
+      },
+      intelligenceItems: {
+        'intel-overview': 'Overview',
+        'intel-diagnoses': 'Diagnoses',
+        'intel-actions': 'Actions',
+        'intel-assistant': 'Assistant',
       },
     },
     header: {
@@ -1215,6 +1250,24 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         'analiz-gunluk-iletisim': {
           title: 'Daily Contact Analysis',
           description: 'Contacts by category for the selected day',
+        },
+      },
+      intelligence: {
+        'intel-overview': {
+          title: 'Intelligence · Overview',
+          description: 'Company KPI summary and call-first-today list',
+        },
+        'intel-diagnoses': {
+          title: 'Intelligence · Diagnoses',
+          description: 'Deterministic sales diagnoses and AI commentary',
+        },
+        'intel-actions': {
+          title: 'Intelligence · Actions',
+          description: 'DE-4 action proposals and approval queue',
+        },
+        'intel-assistant': {
+          title: 'Intelligence · Assistant',
+          description: 'Batch score refresh and sales assistant',
         },
       },
     },

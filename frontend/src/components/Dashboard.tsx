@@ -21,12 +21,6 @@ import type { TaskType } from './QuickTaskForm';
 import type { DashboardData, DashboardItem, DashboardTaskItem, ReminderItem, AutomationNotification } from '../types';
 import { useLocale } from '../i18n/locale';
 import StatusBadge from './StatusBadge';
-import AiPriorityList from './ai/AiPriorityList';
-import AiOpsPanel from './ai/AiOpsPanel';
-import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
-import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
-import AiActionProposals from './ai/AiActionProposals';
-import AiDe4ActionsInbox from './ai/AiDe4ActionsInbox';
 import { readDashboardSectionOpen, writeDashboardSectionOpen } from '../utils/dashboardSectionPrefs';
 
 interface Props {
@@ -39,8 +33,6 @@ interface Props {
   hasCategories?: boolean;
   onEditLead: (leadId: number) => void;
   onAddTask: (type?: TaskType, date?: string) => void;
-  isOwner?: boolean;
-  onDashboardRefresh?: () => void;
 }
 
 const typeColors: Record<string, string> = {
@@ -62,13 +54,10 @@ export default function Dashboard({
   hasCategories = false,
   onEditLead,
   onAddTask,
-  isOwner = false,
-  onDashboardRefresh,
 }: Props) {
   const { app } = useLocale();
   const d = app.dashboard;
   const c = app.common;
-  const [proposalRefresh, setProposalRefresh] = useState(0);
 
   if (loading && !data) {
     return (
@@ -164,33 +153,6 @@ export default function Dashboard({
           </div>
         ))}
       </div>
-
-      <CompanyIntelligenceCard isOwner={isOwner} />
-      <SalesDiagnosesCard
-        onEditLead={onEditLead}
-        onDe4ActionChanged={() => setProposalRefresh((n) => n + 1)}
-      />
-
-      <AiPriorityList
-        isOwner={isOwner}
-        onOpenLead={onEditLead}
-        onProposalQueued={() => setProposalRefresh((n) => n + 1)}
-      />
-
-      <AiActionProposals
-        isOwner={isOwner}
-        onOpenLead={onEditLead}
-        refreshToken={proposalRefresh}
-        onApproved={onDashboardRefresh}
-      />
-
-      <AiDe4ActionsInbox
-        isOwner={isOwner}
-        onOpenLead={onEditLead}
-        refreshToken={proposalRefresh}
-      />
-
-      <AiOpsPanel isOwner={isOwner} />
 
       {safeData.cevap_bekleyen_sayisi > 0 && (
         <div className="flex items-start gap-2.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 lg:gap-3 lg:px-4 lg:py-4">

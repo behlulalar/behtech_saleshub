@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
+  Sparkles,
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
@@ -12,16 +13,19 @@ import {
   Layers,
   MapPin,
   MessageCircle,
+  MessageSquareText,
   Percent,
   Settings,
+  Stethoscope,
   Tag,
   User,
   Users,
+  Zap,
   X,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { useLocale } from '../i18n/locale';
-import type { AnalyticsView, AccountType, Category, UserRole } from '../types';
+import type { AnalyticsView, AccountType, Category, IntelligenceView, UserRole } from '../types';
 import { CategoryIcon } from '../icons';
 
 const ANALYTICS_ICONS: { id: AnalyticsView; icon: typeof Filter }[] = [
@@ -35,6 +39,15 @@ const ANALYTICS_ICONS: { id: AnalyticsView; icon: typeof Filter }[] = [
 ];
 
 const ANALYTICS_IDS = new Set(ANALYTICS_ICONS.map((item) => item.id));
+
+const INTELLIGENCE_ICONS: { id: IntelligenceView; icon: typeof Sparkles }[] = [
+  { id: 'intel-overview', icon: Sparkles },
+  { id: 'intel-diagnoses', icon: Stethoscope },
+  { id: 'intel-actions', icon: Zap },
+  { id: 'intel-assistant', icon: MessageSquareText },
+];
+
+const INTELLIGENCE_IDS = new Set(INTELLIGENCE_ICONS.map((item) => item.id));
 const STORAGE_PREFIX = 'crm-sidebar-section-';
 
 function readSectionOpen(sectionId: string, defaultOpen: boolean) {
@@ -139,6 +152,7 @@ interface Props {
   onSelectLeadDiscovery?: () => void;
   onSelectRequests: () => void;
   onSelectAnalytics: (view: AnalyticsView) => void;
+  onSelectIntelligence: (view: IntelligenceView) => void;
   onSelect: (id: string) => void;
   onManageCategories: () => void;
   onManageTags: () => void;
@@ -160,6 +174,7 @@ function SidebarPanel({
   onSelectLeadDiscovery,
   onSelectRequests,
   onSelectAnalytics,
+  onSelectIntelligence,
   onSelect,
   onManageCategories,
   onManageTags,
@@ -177,6 +192,7 @@ function SidebarPanel({
   const isReports = active === 'raporlar';
   const isRequests = active === 'talepler';
   const isAnalyticsActive = ANALYTICS_IDS.has(active as AnalyticsView);
+  const isIntelligenceActive = INTELLIGENCE_IDS.has(active as IntelligenceView);
   const isCategoryActive = categories.some((cat) => cat.id === active);
 
   const go = (action: () => void) => () => {
@@ -226,6 +242,34 @@ function SidebarPanel({
               <LayoutDashboard size={18} />
               {app.sidebar.dashboard}
             </button>
+
+            <SidebarCollapsibleSection
+              sectionId="intelligence"
+              title={app.sidebar.intelligence}
+              forceOpen={isIntelligenceActive}
+              expandLabel={sectionLabels.expand}
+              collapseLabel={sectionLabels.collapse}
+              className="pt-1"
+            >
+              {INTELLIGENCE_ICONS.map((item) => {
+                const isActive = active === item.id;
+                const Icon = item.icon;
+                const label = app.sidebar.intelligenceItems[item.id];
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={go(() => onSelectIntelligence(item.id))}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-medium transition lg:text-sm ${
+                      isActive ? 'nav-active' : 'nav-inactive'
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })}
+            </SidebarCollapsibleSection>
 
             {showCompanyFeatures && (
               <>
