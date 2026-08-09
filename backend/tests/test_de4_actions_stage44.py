@@ -595,16 +595,20 @@ def test_log_activity_regression_execute(bridge_on, owner_lead):
         db.close()
 
 
-def test_priority_change_still_not_executable(bridge_on, owner_lead):
+def test_meeting_date_still_not_executable(bridge_on, owner_lead):
     token, _user, lead = owner_lead
     c = TestClient(app)
     body = {
-        "action_type": "propose_priority_change",
+        "action_type": "propose_meeting_date",
         "target_entity": "lead",
         "target_entity_id": lead.id,
-        "parameters": {"lead_id": lead.id, "priority": "orta"},
+        "parameters": {
+            "lead_id": lead.id,
+            "meeting_date": "2026-09-01",
+            "meeting_time": "",
+        },
         "reason": "t",
-        "idempotency_key": f"pri44-{uuid.uuid4().hex[:10]}",
+        "idempotency_key": f"mt44-{uuid.uuid4().hex[:10]}",
     }
     r = c.post("/api/ai/actions/propose", json=body, headers={"Authorization": f"Bearer {token}"})
     aid = r.json()["action_id"]

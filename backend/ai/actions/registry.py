@@ -13,6 +13,7 @@ from ai.actions.executors import (
     FollowUpTaskExecutor,
     LogActivityExecutor,
     NoteAppendExecutor,
+    PriorityChangeExecutor,
     StatusChangeExecutor,
     StubExecutor,
 )
@@ -134,6 +135,8 @@ def _build_registry() -> dict[str, ActionDefinition]:
             executor = FollowUpTaskExecutor(action_type=action_type)
         elif action_type == "propose_status_change":
             executor = StatusChangeExecutor(action_type=action_type)
+        elif action_type == "propose_priority_change":
+            executor = PriorityChangeExecutor(action_type=action_type)
         else:
             executor = StubExecutor(action_type=action_type)
         entries.append(

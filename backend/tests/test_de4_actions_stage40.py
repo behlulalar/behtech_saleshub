@@ -177,6 +177,13 @@ def test_follow_up_executor_is_real():
     assert isinstance(ex, FollowUpTaskExecutor)
 
 
+def test_priority_change_executor_is_real():
+    ex = get("propose_priority_change").executor
+    from ai.actions.executors import PriorityChangeExecutor
+
+    assert isinstance(ex, PriorityChangeExecutor)
+
+
 def test_executor_stub_does_not_mutate():
     ex = get("propose_meeting_date").executor
     from unittest.mock import MagicMock

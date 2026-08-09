@@ -30,5 +30,6 @@ EXECUTE_V1_ACTION_TYPES: frozenset[str] = frozenset(
         "propose_note_append",
         "propose_follow_up_task",
         "propose_status_change",
+        "propose_priority_change",
     }
 )

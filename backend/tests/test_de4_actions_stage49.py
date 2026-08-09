@@ -350,15 +350,19 @@ def test_note_append_regression(client, owner_lead):
     _cleanup(action_id)
 
 
-def test_priority_change_still_execute_403(client, owner_lead):
+def test_meeting_date_still_execute_403(client, owner_lead):
     token, _user, lead = owner_lead
     body = {
-        "action_type": "propose_priority_change",
+        "action_type": "propose_meeting_date",
         "target_entity": "lead",
         "target_entity_id": lead.id,
-        "parameters": {"lead_id": lead.id, "priority": "orta"},
+        "parameters": {
+            "lead_id": lead.id,
+            "meeting_date": "2026-09-01",
+            "meeting_time": "",
+        },
         "reason": "t",
-        "idempotency_key": f"pri-{uuid.uuid4().hex[:12]}",
+        "idempotency_key": f"mt-{uuid.uuid4().hex[:12]}",
     }
     r = client.post("/api/ai/actions/propose", json=body, headers={"Authorization": f"Bearer {token}"})
     action_id = r.json()["action_id"]

@@ -307,6 +307,7 @@ export interface AppCopy {
     de4ActionTypeNoteAppend: string;
     de4ActionTypeFollowUp: string;
     de4ActionTypeStatusChange: string;
+    de4ActionTypePriorityChange: string;
     diagnosisInterpretConfidence: string;
     diagnosisInterpretHide: string;
     diagnosisInterpretDisabledTitle: string;
@@ -870,6 +871,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionTypeNoteAppend: 'Lead notuna ekle',
       de4ActionTypeFollowUp: 'Takip görevi',
       de4ActionTypeStatusChange: 'Durum değişikliği',
+      de4ActionTypePriorityChange: 'Öncelik değişikliği',
       diagnosisInterpretConfidence: 'Güven seviyesi',
       diagnosisInterpretHide: 'Yorumu gizle',
       diagnosisInterpretDisabledTitle: 'AI yorumu şu anda kullanılamıyor',
@@ -1449,6 +1451,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionTypeNoteAppend: 'Append lead note',
       de4ActionTypeFollowUp: 'Follow-up task',
       de4ActionTypeStatusChange: 'Status change',
+      de4ActionTypePriorityChange: 'Priority change',
       diagnosisInterpretConfidence: 'Confidence',
       diagnosisInterpretHide: 'Hide insight',
       diagnosisInterpretDisabledTitle: 'AI insight is not available right now',

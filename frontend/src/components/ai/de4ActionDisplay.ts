@@ -17,6 +17,8 @@ export function actionTypeLabel(
       return labels.de4ActionTypeFollowUp ?? formatActionType(actionType);
     case 'propose_status_change':
       return labels.de4ActionTypeStatusChange ?? formatActionType(actionType);
+    case 'propose_priority_change':
+      return labels.de4ActionTypePriorityChange ?? formatActionType(actionType);
     default:
       return formatActionType(actionType);
   }

@@ -13,6 +13,7 @@ from ai.actions.schemas import (
     ProposeFollowUpTaskParams,
     ProposeLogActivityParams,
     ProposeNoteAppendParams,
+    ProposePriorityChangeParams,
     ProposeStatusChangeParams,
 )
 from app_timezone import local_today
@@ -160,6 +161,63 @@ class FollowUpTaskExecutor(ActionExecutor):
                 "takip_field": None,
                 "scheduled_date": None,
                 "task_scheduled": False,
+                "action_type": self.action_type,
+            },
+        )
+
+
+class PriorityChangeExecutor(ActionExecutor):
+    """Stage 4.12 — update Lead.oncelik (PUT /api/leads does not log priority activities)."""
+
+    def execute(
+        self,
+        *,
+        db: Session,
+        organization_id: int,
+        actor_user_id: int,
+        params: BaseModel,
+        **_: Any,
+    ) -> ExecuteResult:
+        _ = actor_user_id
+        if not isinstance(params, ProposePriorityChangeParams):
+            raise TypeError("invalid_params_type")
+        lead = (
+            db.query(Lead)
+            .filter(Lead.id == params.lead_id, Lead.user_id == organization_id)
+            .first()
+        )
+        if not lead:
+            raise ValueError("lead_not_found")
+
+        previous = (lead.oncelik or "orta").strip().lower() or "orta"
+        target = params.priority
+        if previous == target:
+            return ExecuteResult(
+                success=True,
+                message="priority_unchanged",
+                dry_run=False,
+                activity_id=None,
+                result_payload={
+                    "lead_id": lead.id,
+                    "previous_priority": previous,
+                    "new_priority": target,
+                    "priority_changed": False,
+                    "action_type": self.action_type,
+                },
+            )
+
+        lead.oncelik = target
+        db.flush()
+        return ExecuteResult(
+            success=True,
+            message="priority_changed",
+            dry_run=False,
+            activity_id=None,
+            result_payload={
+                "lead_id": lead.id,
+                "previous_priority": previous,
+                "new_priority": target,
+                "priority_changed": True,
                 "action_type": self.action_type,
             },
         )
