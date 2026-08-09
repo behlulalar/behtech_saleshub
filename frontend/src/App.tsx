@@ -1141,6 +1141,9 @@ function App() {
       {showQuickTask && (
         <QuickTaskForm
           categories={categories}
+          defaultCategoryId={
+            isCategoryView(activeView, categories) ? activeView : categories[0]?.id || ''
+          }
           onSave={handleSaveQuickTask}
           onClose={() => {
             setShowQuickTask(false);

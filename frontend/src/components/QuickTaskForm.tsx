@@ -30,6 +30,8 @@ interface Props {
   onClose: () => void;
   initialType?: TaskType;
   initialDate?: string;
+  /** Pre-select category (e.g. current sidebar category). */
+  defaultCategoryId?: string;
 }
 
 function todayStr() {
@@ -37,7 +39,7 @@ function todayStr() {
 }
 
 async function fetchLeadsForCategory(category: string): Promise<Lead[]> {
-  const pageSize = 200;
+  const pageSize = 100;
   const first = await api.getLeads(category, undefined, undefined, undefined, undefined, undefined, 1, pageSize);
   const items = [...first.items];
   for (let page = 2; page <= first.total_pages; page += 1) {
@@ -62,9 +64,15 @@ export default function QuickTaskForm({
   onClose,
   initialType = 'gorusme',
   initialDate,
+  defaultCategoryId,
 }: Props) {
+  const initialCategory =
+    defaultCategoryId && categories.some((c) => c.id === defaultCategoryId)
+      ? defaultCategoryId
+      : categories[0]?.id || '';
+
   const [form, setForm] = useState<QuickTaskData>({
-    category: categories[0]?.id || '',
+    category: initialCategory,
     isletme_adi: '',
     gorev_tipi: initialType,
     tarih: initialDate || todayStr(),
@@ -76,6 +84,7 @@ export default function QuickTaskForm({
   const [error, setError] = useState('');
   const [categoryLeads, setCategoryLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsLoadError, setLeadsLoadError] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | ''>('');
 
   useEffect(() => {
@@ -93,6 +102,7 @@ export default function QuickTaskForm({
 
     let cancelled = false;
     setLeadsLoading(true);
+    setLeadsLoadError('');
     setSelectedLeadId('');
     setForm((f) => ({ ...f, isletme_adi: '', lead_id: undefined }));
 
@@ -101,8 +111,11 @@ export default function QuickTaskForm({
         if (cancelled) return;
         setCategoryLeads(leads);
       })
-      .catch(() => {
-        if (!cancelled) setCategoryLeads([]);
+      .catch((err) => {
+        if (!cancelled) {
+          setCategoryLeads([]);
+          setLeadsLoadError(err instanceof Error ? err.message : 'İşletmeler yüklenemedi');
+        }
       })
       .finally(() => {
         if (!cancelled) setLeadsLoading(false);
@@ -206,6 +219,17 @@ export default function QuickTaskForm({
             <label className="label-field">İşletme Adı *</label>
             {leadsLoading ? (
               <p className="text-sm text-surface-800/50">İşletmeler yükleniyor…</p>
+            ) : leadsLoadError ? (
+              <>
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{leadsLoadError}</p>
+                <input
+                  className="input-field mt-2"
+                  value={form.isletme_adi}
+                  onChange={(e) => setForm({ ...form, isletme_adi: e.target.value, lead_id: undefined })}
+                  placeholder="Salon veya işletme adı"
+                  required
+                />
+              </>
             ) : hasRegisteredLeads ? (
               <select
                 className="input-field"
