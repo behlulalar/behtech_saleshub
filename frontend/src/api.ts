@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setToken, clearRememberCredentials, setIdleTimeoutMinutes, setRememberPreference, persistRememberCredentials } from './auth';
 
 const API_BASE = '/api';
@@ -586,6 +586,21 @@ export const api = {
     request<ActionProposalItem>(`/intelligence/action-proposals/${proposalId}/resolve`, {
       method: 'POST',
       body: JSON.stringify({ approve }),
+    }),
+
+  listAiActions: (statusFilter: 'proposed' | 'approved' | 'all' = 'all', limit = 50) =>
+    request<AiActionListResponse>(
+      `/ai/actions?status_filter=${encodeURIComponent(statusFilter)}&limit=${limit}`,
+    ),
+
+  getAiAction: (actionId: string) => request<AiActionItem>(`/ai/actions/${encodeURIComponent(actionId)}`),
+
+  approveAiAction: (actionId: string) =>
+    request<AiActionItem>(`/ai/actions/${encodeURIComponent(actionId)}/approve`, { method: 'POST' }),
+
+  executeAiAction: (actionId: string) =>
+    request<AiActionExecuteResponse>(`/ai/actions/${encodeURIComponent(actionId)}/execute`, {
+      method: 'POST',
     }),
 
   getCompanyProfile: (refresh = false) =>

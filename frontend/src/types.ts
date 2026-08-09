@@ -518,6 +518,37 @@ export interface ActionProposalItem {
   created_at: string;
 }
 
+export interface AiActionItem {
+  action_id: string;
+  action_type: string;
+  target_entity: string;
+  target_entity_id?: number | null;
+  parameters: Record<string, unknown>;
+  reason: string;
+  source_diagnosis_id?: string | null;
+  source_interpret_run_id?: number | null;
+  status: string;
+  requires_confirmation: boolean;
+  lead_name?: string | null;
+  idempotency_key?: string | null;
+  created_at: string;
+  updated_at?: string;
+  approved_at?: string | null;
+  executed_at?: string | null;
+  execution_result?: Record<string, unknown>;
+  execute_enabled_v1?: boolean;
+}
+
+export interface AiActionExecuteResponse {
+  action: AiActionItem;
+  activity_id?: number | null;
+  already_executed?: boolean;
+}
+
+export interface AiActionListResponse {
+  items: AiActionItem[];
+}
+
 export interface CompanyProfile {
   version?: string;
   computed_at: string;

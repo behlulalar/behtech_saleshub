@@ -380,6 +380,22 @@ def run_migrations(db: Session) -> None:
         OrgIntelligenceProfile.__table__.create(bind=db.bind, checkfirst=True)
         db.commit()
 
+    inspector = inspect(db.bind)
+    tables = inspector.get_table_names()
+    if "ai_actions" not in tables:
+        from database import AiAction
+
+        AiAction.__table__.create(bind=db.bind, checkfirst=True)
+        db.commit()
+
+    inspector = inspect(db.bind)
+    tables = inspector.get_table_names()
+    if "ai_actions" in tables:
+        cols = {c["name"] for c in inspector.get_columns("ai_actions")}
+        if "execution_result_json" not in cols:
+            db.execute(text("ALTER TABLE ai_actions ADD COLUMN execution_result_json TEXT"))
+            db.commit()
+
 
 def seed_user_defaults(db: Session, user_id: int, account_type: str = ACCOUNT_TYPE_COMPANY) -> None:
     categories = (

@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     ai_diagnosis_interpret_max_output_tokens: int = 450
     ai_diagnosis_interpret_temperature: float = 0.2
     ai_diagnosis_interpret_estimated_tokens: int = 1200
+    ai_de4_interpret_proposal_bridge_enabled: bool = False
 
     model_config = SettingsConfigDict(env_file=".env")
 

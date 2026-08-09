@@ -29,6 +29,10 @@ from intelligence.diagnosis.engine import compute_diagnoses
 from reports import parse_report_anchor
 from schemas import DiagnosisInterpretation
 from ai.capabilities.diagnosis_interpret_parse import try_parse_interpretation
+from ai.actions.proposal_bridge import (
+    bridge_recommended_actions_to_proposals,
+    primary_lead_id_from_diagnosis_item,
+)
 
 RUN_TYPE = "diagnosis_interpret"
 DISCLAIMER = "AI yorumu — karar vermeden önce teşhis verilerini kontrol edin."
@@ -196,6 +200,49 @@ def _call_llm(system: str, user: str) -> tuple[str, dict]:
     return chat_completion_structured(system=system, user=user)
 
 
+def _run_proposal_bridge(
+    db: Session,
+    *,
+    user: User,
+    org_id: int,
+    diagnosis_id: str,
+    interpret_run_id: int,
+    interpretation: DiagnosisInterpretation,
+    diagnosis_item: dict,
+) -> dict | None:
+    if not settings.ai_de4_interpret_proposal_bridge_enabled:
+        return None
+    if not interpretation.recommended_actions:
+        return None
+    role = getattr(user, "role", None) or "owner"
+    primary_lead = primary_lead_id_from_diagnosis_item(diagnosis_item)
+    try:
+        summary = bridge_recommended_actions_to_proposals(
+            db,
+            user_id=user.id,
+            org_id=org_id,
+            role=role,
+            diagnosis_id=diagnosis_id,
+            interpret_run_id=interpret_run_id,
+            recommended_actions=interpretation.recommended_actions,
+            primary_lead_id=primary_lead,
+        )
+        return summary.to_dict()
+    except Exception:
+        db.rollback()
+        return {
+            "recommendation_count": len(interpretation.recommended_actions),
+            "mapped_count": 0,
+            "no_action_count": 0,
+            "proposed_count": 0,
+            "skipped_count": len(interpretation.recommended_actions),
+            "created_count": 0,
+            "action_ids": [],
+            "items": [],
+            "bridge_error": True,
+        }
+
+
 def run_diagnosis_interpret(
     db: Session,
     *,
@@ -248,6 +295,17 @@ def run_diagnosis_interpret(
         if cached_run:
             parsed = _interpretation_from_run(cached_run)
             if parsed:
+                bridge = _run_proposal_bridge(
+                    db,
+                    user=user,
+                    org_id=org_id,
+                    diagnosis_id=diagnosis_id,
+                    interpret_run_id=cached_run.id,
+                    interpretation=parsed,
+                    diagnosis_item=item,
+                )
+                if bridge is not None:
+                    db.commit()
                 return {
                     "diagnosis_id": diagnosis_id,
                     "interpretation": parsed,
@@ -256,6 +314,7 @@ def run_diagnosis_interpret(
                     "context_fingerprint": fingerprint,
                     "disclaimer": DISCLAIMER,
                     "error_code": None,
+                    "proposal_bridge": bridge,
                 }
             append_run_step(
                 db,
@@ -376,6 +435,20 @@ def run_diagnosis_interpret(
     db.commit()
     db.refresh(run)
 
+    bridge = None
+    if interpretation is not None:
+        bridge = _run_proposal_bridge(
+            db,
+            user=user,
+            org_id=org_id,
+            diagnosis_id=diagnosis_id,
+            interpret_run_id=run.id,
+            interpretation=interpretation,
+            diagnosis_item=item,
+        )
+        if bridge is not None:
+            db.commit()
+
     return {
         "diagnosis_id": diagnosis_id,
         "interpretation": interpretation,
@@ -384,4 +457,5 @@ def run_diagnosis_interpret(
         "context_fingerprint": fingerprint,
         "disclaimer": DISCLAIMER,
         "error_code": None,
+        "proposal_bridge": bridge,
     }

@@ -259,6 +259,26 @@ export interface AppCopy {
     proposalsQueue: string;
     proposalsQueued: string;
     proposalsActionAccept: string;
+    de4ActionsTitle: string;
+    de4ActionsHint: string;
+    de4ActionsEmpty: string;
+    de4ActionsStatusProposed: string;
+    de4ActionsSourceDiagnosis: string;
+    de4ActionsSuggestedAt: string;
+    de4ActionsExecuteSoon: string;
+    de4ActionsApprove: string;
+    de4ActionsExecute: string;
+    de4ActionsExecuting: string;
+    de4ActionsExecuted: string;
+    de4ActionsFailed: string;
+    de4ActionsCancelled: string;
+    de4ActionsExpired: string;
+    de4ActionsStatusApproved: string;
+    de4ActionsConfirmExecuteTitle: string;
+    de4ActionsConfirmExecuteBody: string;
+    de4ActionsConfirmCancel: string;
+    de4ActionsConfirmOk: string;
+    de4ActionsErrorGeneric: string;
     runHistoryTitle: string;
     runHistoryEmpty: string;
     runHistoryShow: string;
@@ -791,6 +811,27 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       proposalsQueue: 'Onaya gönder',
       proposalsQueued: 'Onay kuyruğuna eklendi',
       proposalsActionAccept: 'Öncelik planını uygula',
+      de4ActionsTitle: 'AI aksiyon önerileri (DE-4)',
+      de4ActionsHint: 'Onay sonrası yalnızca seçili aksiyonlar CRM\'e yazılır (v1: aktivite kaydı).',
+      de4ActionsEmpty: 'Gösterilecek DE-4 aksiyonu yok.',
+      de4ActionsStatusProposed: 'Önerildi',
+      de4ActionsSourceDiagnosis: 'Kaynak teşhis',
+      de4ActionsSuggestedAt: 'Önerildiği tarih',
+      de4ActionsExecuteSoon: 'Bu tür henüz uygulanamaz',
+      de4ActionsApprove: 'Onayla',
+      de4ActionsExecute: 'Uygula',
+      de4ActionsExecuting: 'Uygulanıyor…',
+      de4ActionsExecuted: 'Uygulandı',
+      de4ActionsFailed: 'Başarısız',
+      de4ActionsCancelled: 'İptal',
+      de4ActionsExpired: 'Süresi doldu',
+      de4ActionsStatusApproved: 'Onaylandı',
+      de4ActionsConfirmExecuteTitle: 'Aksiyonu uygula',
+      de4ActionsConfirmExecuteBody:
+        'Bu aksiyon lead kaydında onayladığınız değişikliği uygular. Devam etmek istediğinize emin misiniz?',
+      de4ActionsConfirmCancel: 'Vazgeç',
+      de4ActionsConfirmOk: 'Evet, uygula',
+      de4ActionsErrorGeneric: 'İşlem tamamlanamadı. Lütfen tekrar deneyin.',
       runHistoryTitle: 'Son AI işleri',
       runHistoryEmpty: 'Henüz kayıtlı run yok.',
       runHistoryShow: 'Listeyi göster',
@@ -1340,6 +1381,27 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       proposalsQueue: 'Send for approval',
       proposalsQueued: 'Added to approval queue',
       proposalsActionAccept: 'Apply priority plan',
+      de4ActionsTitle: 'AI action proposals (DE-4)',
+      de4ActionsHint: 'After approval, only selected actions write to CRM (v1: activity log).',
+      de4ActionsEmpty: 'No DE-4 actions to show.',
+      de4ActionsStatusProposed: 'Proposed',
+      de4ActionsSourceDiagnosis: 'Source diagnosis',
+      de4ActionsSuggestedAt: 'Suggested at',
+      de4ActionsExecuteSoon: 'This type cannot be executed yet',
+      de4ActionsApprove: 'Approve',
+      de4ActionsExecute: 'Execute',
+      de4ActionsExecuting: 'Executing…',
+      de4ActionsExecuted: 'Executed',
+      de4ActionsFailed: 'Failed',
+      de4ActionsCancelled: 'Cancelled',
+      de4ActionsExpired: 'Expired',
+      de4ActionsStatusApproved: 'Approved',
+      de4ActionsConfirmExecuteTitle: 'Execute action',
+      de4ActionsConfirmExecuteBody:
+        'This will apply the approved change on the lead record. Are you sure you want to continue?',
+      de4ActionsConfirmCancel: 'Cancel',
+      de4ActionsConfirmOk: 'Yes, execute',
+      de4ActionsErrorGeneric: 'Could not complete the action. Please try again.',
       runHistoryTitle: 'Recent AI runs',
       runHistoryEmpty: 'No runs yet.',
       runHistoryShow: 'Show list',

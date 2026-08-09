@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -832,6 +832,7 @@ class DiagnosisInterpretResponse(BaseModel):
     context_fingerprint: str | None = None
     disclaimer: str = ""
     error_code: str | None = None
+    proposal_bridge: dict[str, Any] | None = None
 
 
 class SummarizeLeadRequest(BaseModel):
@@ -918,6 +919,62 @@ class ActionProposalCreateRequest(BaseModel):
 
 class ActionProposalResolveRequest(BaseModel):
     approve: bool
+
+
+class AiActionProposeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    action_type: str = Field(min_length=1, max_length=80)
+    target_entity: str = Field(default="lead", max_length=40)
+    target_entity_id: int = Field(gt=0)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    reason: str = Field(default="", max_length=600)
+    source_diagnosis_id: str | None = Field(default=None, max_length=80)
+    source_interpret_run_id: int | None = Field(default=None, gt=0)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+
+
+class AiActionFromRecommendationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = Field(min_length=1, max_length=400)
+    reason: str = Field(default="", max_length=600)
+    lead_id: int = Field(gt=0)
+    priority: str | None = Field(default=None, max_length=20)
+    source_diagnosis_id: str | None = Field(default=None, max_length=80)
+    source_interpret_run_id: int | None = Field(default=None, gt=0)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+
+
+class AiActionItemResponse(BaseModel):
+    action_id: str
+    action_type: str
+    target_entity: str
+    target_entity_id: int | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    reason: str = ""
+    source_diagnosis_id: str | None = None
+    source_interpret_run_id: int | None = None
+    status: str
+    requires_confirmation: bool = True
+    lead_name: str | None = None
+    idempotency_key: str | None = None
+    created_at: str
+    updated_at: str = ""
+    approved_at: str | None = None
+    executed_at: str | None = None
+    execution_result: dict[str, Any] = Field(default_factory=dict)
+    execute_enabled_v1: bool = False
+
+
+class AiActionExecuteResponse(BaseModel):
+    action: AiActionItemResponse
+    activity_id: int | None = None
+    already_executed: bool = False
+
+
+class AiActionListResponse(BaseModel):
+    items: list[AiActionItemResponse]
 
 
 class CompanyProfileResponse(BaseModel):

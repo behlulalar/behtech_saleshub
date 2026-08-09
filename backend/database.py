@@ -391,6 +391,37 @@ class ActionProposal(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AiAction(Base):
+    """DE-4 persisted action proposals (PROPOSE only — execution in Stage 4.2)."""
+
+    __tablename__ = "ai_actions"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "idempotency_key", name="uq_ai_actions_org_idempotency"),
+        Index("ix_ai_actions_org_status", "organization_id", "status"),
+        Index("ix_ai_actions_org_created", "organization_id", "created_at"),
+        Index("ix_ai_actions_source_diagnosis", "organization_id", "source_diagnosis_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    action_id = Column(String(36), nullable=False, unique=True, index=True)
+    organization_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    action_type = Column(String(80), nullable=False, index=True)
+    target_entity = Column(String(40), nullable=False, default="lead")
+    target_entity_id = Column(Integer, nullable=True, index=True)
+    parameters_json = Column(Text, nullable=False, default="{}")
+    reason = Column(String(600), nullable=False, default="")
+    source_diagnosis_id = Column(String(80), nullable=True)
+    source_interpret_run_id = Column(Integer, ForeignKey("ai_runs.id", ondelete="SET NULL"), nullable=True)
+    requested_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    status = Column(String(20), nullable=False, default="proposed")
+    idempotency_key = Column(String(128), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    approved_at = Column(DateTime, nullable=True)
+    executed_at = Column(DateTime, nullable=True)
+    execution_result_json = Column(Text, nullable=True)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     from migrate_auth import run_migrations, seed_admin_user

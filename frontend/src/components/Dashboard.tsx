@@ -24,6 +24,7 @@ import AiOpsPanel from './ai/AiOpsPanel';
 import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
 import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
 import AiActionProposals from './ai/AiActionProposals';
+import AiDe4ActionsInbox from './ai/AiDe4ActionsInbox';
 
 interface Props {
   data: DashboardData | null;
@@ -175,6 +176,12 @@ export default function Dashboard({
         onOpenLead={onEditLead}
         refreshToken={proposalRefresh}
         onApproved={onDashboardRefresh}
+      />
+
+      <AiDe4ActionsInbox
+        isOwner={isOwner}
+        onOpenLead={onEditLead}
+        refreshToken={proposalRefresh}
       />
 
       <AiOpsPanel isOwner={isOwner} />

@@ -22,8 +22,19 @@ from ai.deps import (
     require_chat_enabled,
 )
 from ai.llm_client import AiNotConfiguredError, DiagnosisOpenAiRequiredError
-from ai.run_worker import execute_run, process_pending_runs
+from ai.actions.propose_service import (
+    ProposeValidationError,
+    ai_action_to_dict,
+    get_ai_action_for_org,
+    list_ai_actions_for_org,
+    propose_ai_action,
+    propose_from_recommended_action,
+    _lead_name,
+)
+from ai.actions.execute_service import ExecuteValidationError, approve_ai_action, execute_ai_action
+from ai.actions.mapper import MAPPER_NO_ACTION
 from ai.store import create_queued_run, get_run_for_org, list_runs_for_org, run_to_api_dict
+from ai.run_worker import execute_run, process_pending_runs
 from ai.usage import usage_summary
 from config import settings
 from roles import require_owner
@@ -45,6 +56,11 @@ from schemas import (
     DiagnosisInterpretRequest,
     DiagnosisInterpretResponse,
     IntelligenceInsightItem,
+    AiActionProposeRequest,
+    AiActionFromRecommendationRequest,
+    AiActionItemResponse,
+    AiActionExecuteResponse,
+    AiActionListResponse,
 )
 
 router = APIRouter()
@@ -202,6 +218,206 @@ def diagnosis_interpret(
         raise HTTPException(status_code=502, detail="Teşhis yorumu oluşturulamadı") from exc
 
     return DiagnosisInterpretResponse(**result)
+
+
+def _propose_validation_to_http(exc: ProposeValidationError) -> HTTPException:
+    code = exc.code
+    if code in ("unknown_action_type", "invalid_parameters", "invalid_target_entity", "target_entity_id_required", "target_lead_mismatch", "idempotency_key_invalid"):
+        status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    elif code in ("action_disabled", "action_not_allowed", "role_not_allowed"):
+        status_code = status.HTTP_403_FORBIDDEN
+    elif code in ("target_not_in_org", "invalid_source_run"):
+        status_code = status.HTTP_404_NOT_FOUND
+    else:
+        status_code = status.HTTP_400_BAD_REQUEST
+    return HTTPException(status_code=status_code, detail=exc.detail)
+
+
+def _action_item(db, org_id: int, row) -> AiActionItemResponse:
+    lead_id = row.target_entity_id if row.target_entity == "lead" else None
+    return AiActionItemResponse(
+        **ai_action_to_dict(row, lead_name=_lead_name(db, org_id, lead_id))
+    )
+
+
+@router.post("/actions/propose", response_model=AiActionItemResponse)
+def propose_ai_action_endpoint(
+    body: AiActionProposeRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, user, org_id = ctx
+    _ = owner
+    role = getattr(user, "role", None) or "owner"
+    try:
+        row, created = propose_ai_action(
+            db,
+            user_id=user.id,
+            org_id=org_id,
+            role=role,
+            action_type=body.action_type,
+            target_entity=body.target_entity,
+            target_entity_id=body.target_entity_id,
+            parameters=body.parameters,
+            reason=body.reason,
+            source_diagnosis_id=body.source_diagnosis_id,
+            source_interpret_run_id=body.source_interpret_run_id,
+            idempotency_key=body.idempotency_key,
+        )
+    except ProposeValidationError as exc:
+        raise _propose_validation_to_http(exc) from exc
+    db.commit()
+    db.refresh(row)
+    response = _action_item(db, org_id, row)
+    if created:
+        return response
+    return response
+
+
+@router.post("/actions/propose-from-recommendation", response_model=AiActionItemResponse)
+def propose_from_recommendation_endpoint(
+    body: AiActionFromRecommendationRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    """Deterministic mapper → proposal (does not call OpenAI)."""
+    require_ai_enabled()
+    db, user, org_id = ctx
+    _ = owner
+    role = getattr(user, "role", None) or "owner"
+    try:
+        row, _created, outcome = propose_from_recommended_action(
+            db,
+            user_id=user.id,
+            org_id=org_id,
+            role=role,
+            title=body.title,
+            reason=body.reason,
+            lead_id=body.lead_id,
+            priority=body.priority,
+            source_diagnosis_id=body.source_diagnosis_id,
+            source_interpret_run_id=body.source_interpret_run_id,
+            idempotency_key=body.idempotency_key,
+        )
+    except ProposeValidationError as exc:
+        raise _propose_validation_to_http(exc) from exc
+    if row is None or outcome == MAPPER_NO_ACTION:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Öneri eyleme dönüştürülemedi (NO_ACTION)",
+        )
+    db.commit()
+    db.refresh(row)
+    return _action_item(db, org_id, row)
+
+
+def _execute_validation_to_http(exc: ExecuteValidationError) -> HTTPException:
+    code = exc.code
+    if code in (
+        "unknown_action_type",
+        "invalid_parameters",
+        "idempotency_key_required",
+        "invalid_transition",
+        "invalid_status_for_approve",
+        "invalid_status_for_execute",
+    ):
+        status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    elif code in ("action_disabled", "action_not_allowed", "role_not_allowed", "execute_not_enabled"):
+        status_code = status.HTTP_403_FORBIDDEN
+    elif code == "not_found":
+        status_code = status.HTTP_404_NOT_FOUND
+    elif code in ("action_in_progress",):
+        status_code = status.HTTP_409_CONFLICT
+    elif code in ("action_failed", "executor_failed"):
+        status_code = status.HTTP_502_BAD_GATEWAY
+    else:
+        status_code = status.HTTP_400_BAD_REQUEST
+    return HTTPException(status_code=status_code, detail=exc.detail)
+
+
+@router.post("/actions/{action_id}/approve", response_model=AiActionItemResponse)
+def approve_ai_action_endpoint(
+    action_id: str,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, _user, org_id = ctx
+    _ = owner
+    role = getattr(_user, "role", None) or "owner"
+    try:
+        row = approve_ai_action(db, org_id=org_id, role=role, action_id=action_id)
+    except ExecuteValidationError as exc:
+        raise _execute_validation_to_http(exc) from exc
+    db.commit()
+    db.refresh(row)
+    return _action_item(db, org_id, row)
+
+
+@router.post("/actions/{action_id}/execute", response_model=AiActionExecuteResponse)
+def execute_ai_action_endpoint(
+    action_id: str,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, user, org_id = ctx
+    _ = owner
+    role = getattr(user, "role", None) or "owner"
+    try:
+        row, did_run, result = execute_ai_action(
+            db,
+            org_id=org_id,
+            role=role,
+            actor_user_id=user.id,
+            action_id=action_id,
+        )
+    except ExecuteValidationError as exc:
+        db.commit()
+        raise _execute_validation_to_http(exc) from exc
+    db.commit()
+    db.refresh(row)
+    item = _action_item(db, org_id, row)
+    activity_id = result.activity_id if result else item.execution_result.get("activity_id")
+    if isinstance(activity_id, float):
+        activity_id = int(activity_id)
+    return AiActionExecuteResponse(
+        action=item,
+        activity_id=activity_id if isinstance(activity_id, int) else None,
+        already_executed=not did_run and row.status == "executed",
+    )
+
+
+@router.get("/actions", response_model=AiActionListResponse)
+def list_ai_actions(
+    status_filter: str = "proposed",
+    limit: int = 50,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, _user, org_id = ctx
+    _ = owner
+    limit = max(1, min(limit, 100))
+    rows = list_ai_actions_for_org(db, org_id, status=status_filter, limit=limit)
+    items = [_action_item(db, org_id, r) for r in rows]
+    return AiActionListResponse(items=items)
+
+
+@router.get("/actions/{action_id}", response_model=AiActionItemResponse)
+def get_ai_action(
+    action_id: str,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, _user, org_id = ctx
+    _ = owner
+    row = get_ai_action_for_org(db, org_id, action_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Aksiyon bulunamadı")
+    return _action_item(db, org_id, row)
 
 
 @router.post("/runs", response_model=AiRunCreateResponse)
