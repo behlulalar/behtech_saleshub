@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Activity, ChevronRight, Loader2, Stethoscope } from 'lucide-react';
-import { api } from '../../api';
-import type { DiagnosisItem, DiagnosisPriorityLead } from '../../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Activity, ChevronRight, Loader2, Sparkles, Stethoscope } from 'lucide-react';
+import { ApiHttpError, api } from '../../api';
+import { useLocale } from '../../i18n/locale';
+import type { DiagnosisItem, DiagnosisInterpretResponse, DiagnosisPriorityLead } from '../../types';
+import { aiPriorityBadgeClass, aiPriorityLabel } from './aiPriorityUi';
+import {
+  type InterpretAvailability,
+  type InterpretUiState,
+  hasRenderableInterpretation,
+  interpretPrimaryAction,
+  interpretResponseToUiState,
+  isInterpretButtonDisabled,
+  mapHttpStatusToInterpretError,
+} from './salesDiagnosesInterpretLogic';
 
 const severityClass: Record<string, string> = {
   low: 'bg-surface-100 text-surface-700',
@@ -23,9 +34,11 @@ type Props = {
 function PriorityLeadRow({
   row,
   onEditLead,
+  copy,
 }: {
   row: DiagnosisPriorityLead;
   onEditLead?: (leadId: number) => void;
+  copy: (typeof import('../../i18n/app').appCopy)['tr']['salesDiagnoses'];
 }) {
   return (
     <li className="flex items-center gap-2 rounded-lg border border-surface-100 bg-surface-50/80 px-2.5 py-2 text-xs">
@@ -37,10 +50,12 @@ function PriorityLeadRow({
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-surface-900">{row.lead_name}</p>
         <p className="text-surface-600/80">
-          Skor {row.diagnosis_priority_score}
-          {row.diagnosis_modifier > 0 ? ` (+${row.diagnosis_modifier} teşhis)` : ''}
-          {row.idle_days != null ? ` · ${row.idle_days} gün` : ''}
-          {row.offer_age_days != null ? ` · teklif ${row.offer_age_days} gün` : ''}
+          {copy.scoreLabel} {row.diagnosis_priority_score}
+          {row.diagnosis_modifier > 0
+            ? ` (+${row.diagnosis_modifier} ${copy.diagnosisModifierSuffix})`
+            : ''}
+          {row.idle_days != null ? ` · ${row.idle_days} ${copy.daysSuffix}` : ''}
+          {row.offer_age_days != null ? ` · ${copy.offerAgeSuffix} ${row.offer_age_days} ${copy.daysSuffix}` : ''}
         </p>
       </div>
       {onEditLead ? (
@@ -49,7 +64,7 @@ function PriorityLeadRow({
           onClick={() => onEditLead(row.lead_id)}
           className="flex shrink-0 items-center gap-0.5 text-violet-700 hover:text-violet-900"
         >
-          Aç
+          {copy.openLead}
           <ChevronRight size={14} />
         </button>
       ) : null}
@@ -57,10 +72,229 @@ function PriorityLeadRow({
   );
 }
 
+function InterpretationBody({
+  response,
+  labels,
+  priorityLabels,
+}: {
+  response: DiagnosisInterpretResponse;
+  labels: (typeof import('../../i18n/app').appCopy)['tr']['ai'];
+  priorityLabels: Record<string, string>;
+}) {
+  const interp = response.interpretation;
+  if (!interp || !hasRenderableInterpretation(response)) return null;
+
+  const findings = (interp.key_findings ?? []).filter((line) => line?.trim());
+  const actions = interp.recommended_actions ?? [];
+
+  return (
+    <div className="space-y-3 text-sm text-surface-800">
+      {response.cached ? (
+        <p className="text-xs font-medium text-violet-700/90">{labels.diagnosisInterpretCachedBadge}</p>
+      ) : null}
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-500">
+          {labels.diagnosisInterpretSummary}
+        </h4>
+        <p className="mt-1 leading-relaxed">{interp.summary}</p>
+      </div>
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-500">
+          {labels.diagnosisInterpretWhy}
+        </h4>
+        <p className="mt-1 leading-relaxed">{interp.why_it_matters}</p>
+      </div>
+      {findings.length > 0 ? (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-500">
+            {labels.diagnosisInterpretFindings}
+          </h4>
+          <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+            {findings.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {actions.length > 0 ? (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-500">
+            {labels.diagnosisInterpretActions}
+          </h4>
+          <ol className="mt-2 space-y-2">
+            {actions.map((action, idx) => (
+              <li
+                key={`${action.title}-${idx}`}
+                className="rounded-lg border border-surface-100 bg-white px-3 py-2"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-surface-900">
+                    {idx + 1}. {action.title}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${aiPriorityBadgeClass(action.priority)}`}
+                  >
+                    {aiPriorityLabel(action.priority, priorityLabels)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-surface-700">{action.reason}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+      <p className="text-xs text-surface-600">
+        <span className="font-medium text-surface-700">{labels.diagnosisInterpretConfidence}: </span>
+        {aiPriorityLabel(interp.confidence, priorityLabels)}
+      </p>
+      {response.disclaimer?.trim() ? (
+        <p className="border-t border-surface-100 pt-2 text-xs text-surface-500">{response.disclaimer}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function DiagnosisInterpretSection({
+  diagnosisId,
+  availability,
+  state,
+  onRequest,
+  onToggleExpand,
+  labels,
+  priorityLabels,
+}: {
+  diagnosisId: string;
+  availability: InterpretAvailability;
+  state: InterpretUiState;
+  onRequest: (diagnosisId: string) => void;
+  onToggleExpand: (diagnosisId: string) => void;
+  labels: (typeof import('../../i18n/app').appCopy)['tr']['ai'];
+  priorityLabels: Record<string, string>;
+}) {
+  const errorMessage =
+    state.phase === 'error'
+      ? state.kind === 'unavailable'
+        ? labels.diagnosisInterpretUnavailable
+        : state.kind === 'notFound'
+          ? labels.diagnosisInterpretNotFound
+          : state.kind === 'quota'
+            ? labels.diagnosisInterpretQuota
+            : state.kind === 'invalidOutput'
+              ? labels.diagnosisInterpretInvalidOutput
+              : labels.diagnosisInterpretGenericError
+      : null;
+
+  const showPanel =
+    state.phase === 'loading' ||
+    (state.phase === 'ready' && state.expanded) ||
+    (state.phase === 'error' && state.expanded);
+
+  const buttonDisabled = isInterpretButtonDisabled(state, availability);
+  const interpretAvailable = availability === 'available';
+
+  const buttonLabel =
+    state.phase === 'loading'
+      ? labels.diagnosisInterpretLoading
+      : availability === 'loading'
+        ? labels.diagnosisInterpretStatusLoading
+        : labels.diagnosisInterpretButton;
+
+  const buttonTitle =
+    availability === 'unavailable' ? labels.diagnosisInterpretDisabledTitle : undefined;
+
+  const panelId = `diagnosis-interpret-panel-${diagnosisId}`;
+
+  const handlePrimaryClick = () => {
+    const action = interpretPrimaryAction(state, interpretAvailable);
+    if (action === 'noop') return;
+    if (action === 'toggle') {
+      onToggleExpand(diagnosisId);
+      return;
+    }
+    if (action === 'retry' || action === 'fetch') {
+      onRequest(diagnosisId);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-surface-100 pt-3">
+      {availability === 'unavailable' ? (
+        <p className="mb-2 text-xs text-surface-600/80">{labels.diagnosisInterpretUnavailable}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={handlePrimaryClick}
+        disabled={buttonDisabled}
+        title={buttonTitle}
+        aria-expanded={showPanel}
+        aria-controls={showPanel ? panelId : undefined}
+        aria-busy={state.phase === 'loading'}
+        aria-label={labels.diagnosisInterpretButton}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {state.phase === 'loading' || availability === 'loading' ? (
+          <Loader2 size={14} className="animate-spin" aria-hidden />
+        ) : (
+          <Sparkles size={14} aria-hidden />
+        )}
+        {buttonLabel}
+      </button>
+
+      {showPanel ? (
+        <div
+          id={panelId}
+          role="region"
+          aria-live="polite"
+          className="mt-2 rounded-lg border border-violet-100 bg-violet-50/40 p-3 sm:p-4"
+        >
+          {state.phase === 'loading' ? (
+            <p className="flex items-center gap-2 text-sm text-surface-700">
+              <Loader2 size={16} className="animate-spin text-violet-600" aria-hidden />
+              {labels.diagnosisInterpretLoading}
+            </p>
+          ) : null}
+          {state.phase === 'ready' && state.response && hasRenderableInterpretation(state.response) ? (
+            <>
+              <InterpretationBody
+                response={state.response}
+                labels={labels}
+                priorityLabels={priorityLabels}
+              />
+              <button
+                type="button"
+                onClick={() => onToggleExpand(diagnosisId)}
+                className="mt-3 text-xs font-medium text-violet-700 hover:text-violet-900"
+              >
+                {labels.diagnosisInterpretHide}
+              </button>
+            </>
+          ) : null}
+          {state.phase === 'ready' && state.response && !hasRenderableInterpretation(state.response) ? (
+            <p className="text-sm text-amber-900/90">{labels.diagnosisInterpretInvalidOutput}</p>
+          ) : null}
+          {state.phase === 'error' && errorMessage ? (
+            <p className="text-sm text-amber-900/90">{errorMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function SalesDiagnosesCard({ onEditLead }: Props) {
+  const { app, locale } = useLocale();
+  const t = app.ai;
+  const cardCopy = app.salesDiagnoses;
+  const priorityLabels = app.common;
+
   const [items, setItems] = useState<DiagnosisItem[]>([]);
+  const [periodType, setPeriodType] = useState('monthly');
+  const [anchor, setAnchor] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [interpretAvailability, setInterpretAvailability] = useState<InterpretAvailability>('loading');
+  const [interpretById, setInterpretById] = useState<Record<string, InterpretUiState>>({});
+  const inFlightRef = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,17 +302,111 @@ export default function SalesDiagnosesCard({ onEditLead }: Props) {
     try {
       const data = await api.listDiagnoses('monthly');
       setItems(data.items ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Teşhisler yüklenemedi');
+      setPeriodType(data.period_type || 'monthly');
+      setAnchor(data.anchor || '');
+    } catch {
+      setError(cardCopy.loadFailed);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cardCopy.loadFailed]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getAiStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setInterpretAvailability(status.diagnosis_interpret_available ? 'available' : 'unavailable');
+      })
+      .catch(() => {
+        if (!cancelled) setInterpretAvailability('unavailable');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const requestInterpret = useCallback(
+    async (diagnosisId: string) => {
+      if (interpretAvailability !== 'available') {
+        setInterpretById((prev) => ({
+          ...prev,
+          [diagnosisId]: { phase: 'error', kind: 'unavailable', expanded: true },
+        }));
+        return;
+      }
+
+      if (inFlightRef.current.has(diagnosisId)) {
+        return;
+      }
+
+      let skipFetch = false;
+      setInterpretById((prev) => {
+        const cur = prev[diagnosisId];
+        if (cur?.phase === 'loading') {
+          skipFetch = true;
+          return prev;
+        }
+        if (cur?.phase === 'ready') {
+          skipFetch = true;
+          return { ...prev, [diagnosisId]: { ...cur, expanded: true } };
+        }
+        return { ...prev, [diagnosisId]: { phase: 'loading' } };
+      });
+
+      if (skipFetch) {
+        return;
+      }
+
+      inFlightRef.current.add(diagnosisId);
+
+      try {
+        const response = await api.interpretDiagnosis({
+          diagnosis_id: diagnosisId,
+          period: periodType,
+          date: anchor || null,
+          locale,
+          refresh: false,
+        });
+
+        setInterpretById((prev) => ({
+          ...prev,
+          [diagnosisId]: interpretResponseToUiState(response),
+        }));
+      } catch (err) {
+        const kind =
+          err instanceof ApiHttpError
+            ? mapHttpStatusToInterpretError(err.status)
+            : 'generic';
+        setInterpretById((prev) => ({
+          ...prev,
+          [diagnosisId]: { phase: 'error', kind, expanded: true },
+        }));
+      } finally {
+        inFlightRef.current.delete(diagnosisId);
+      }
+    },
+    [anchor, interpretAvailability, locale, periodType],
+  );
+
+  const toggleExpand = useCallback((diagnosisId: string) => {
+    setInterpretById((prev) => {
+      const cur = prev[diagnosisId];
+      if (cur?.phase === 'ready') {
+        return { ...prev, [diagnosisId]: { ...cur, expanded: !cur.expanded } };
+      }
+      if (cur?.phase === 'error') {
+        return { ...prev, [diagnosisId]: { ...cur, expanded: !cur.expanded } };
+      }
+      return prev;
+    });
+  }, []);
 
   return (
     <section className="card overflow-hidden border-surface-200">
@@ -87,20 +415,18 @@ export default function SalesDiagnosesCard({ onEditLead }: Props) {
           <Stethoscope size={20} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-surface-900 sm:text-base">Satış teşhisleri</h3>
-          <p className="mt-1 text-xs text-surface-800/60 sm:text-sm">
-            Deterministik kurallar (LLM yok). Öncelik: mevcut lead skoru + lead&apos;e özel teşhis.
-          </p>
+          <h3 className="text-sm font-semibold text-surface-900 sm:text-base">{cardCopy.title}</h3>
+          <p className="mt-1 text-xs text-surface-800/60 sm:text-sm">{cardCopy.subtitle}</p>
         </div>
-        {loading ? <Loader2 size={18} className="animate-spin text-surface-400" /> : null}
+        {loading ? <Loader2 size={18} className="animate-spin text-surface-400" aria-hidden /> : null}
       </div>
 
       {error ? <p className="px-4 py-3 text-sm text-rose-600 sm:px-5">{error}</p> : null}
 
       {!error && !loading && items.length === 0 ? (
         <p className="flex items-center gap-2 px-4 py-4 text-sm text-surface-800/55 sm:px-5">
-          <Activity size={16} />
-          Şu an tetiklenen teşhis yok — veriler normal görünüyor.
+          <Activity size={16} aria-hidden />
+          {cardCopy.empty}
         </p>
       ) : null}
 
@@ -120,29 +446,48 @@ export default function SalesDiagnosesCard({ onEditLead }: Props) {
               <p className="mt-0.5 text-xs leading-relaxed text-surface-800/65">{d.description}</p>
 
               {d.affected_leads_available === false ? (
-                <p className="mt-2 text-xs text-surface-600/70">
-                  Bu teşhis için lead bazlı öncelik listesi yok.
-                </p>
+                <p className="mt-2 text-xs text-surface-600/70">{cardCopy.noLeadPriorityList}</p>
               ) : null}
 
               {d.impact && d.affected_leads_available !== false ? (
                 <p className="mt-2 text-xs text-surface-700">
-                  Öncelik dağılımı:{' '}
-                  <span className="font-medium text-rose-700">{d.impact.high_priority_count} yüksek</span>
+                  {cardCopy.impactDistribution}{' '}
+                  <span className="font-medium text-rose-700">
+                    {d.impact.high_priority_count} {cardCopy.impactHigh}
+                  </span>
                   {', '}
-                  <span className="font-medium text-amber-800">{d.impact.medium_priority_count} orta</span>
+                  <span className="font-medium text-amber-800">
+                    {d.impact.medium_priority_count} {cardCopy.impactMedium}
+                  </span>
                   {', '}
-                  <span>{d.impact.low_priority_count} düşük</span>
+                  <span>
+                    {d.impact.low_priority_count} {cardCopy.impactLow}
+                  </span>
                 </p>
               ) : null}
 
               {d.top_priority_leads && d.top_priority_leads.length > 0 ? (
                 <ul className="mt-2 space-y-1.5">
                   {d.top_priority_leads.map((row) => (
-                    <PriorityLeadRow key={row.lead_id} row={row} onEditLead={onEditLead} />
+                    <PriorityLeadRow
+                      key={row.lead_id}
+                      row={row}
+                      onEditLead={onEditLead}
+                      copy={cardCopy}
+                    />
                   ))}
                 </ul>
               ) : null}
+
+              <DiagnosisInterpretSection
+                diagnosisId={d.diagnosis_id}
+                availability={interpretAvailability}
+                state={interpretById[d.diagnosis_id] ?? { phase: 'idle' }}
+                onRequest={requestInterpret}
+                onToggleExpand={toggleExpand}
+                labels={t}
+                priorityLabels={priorityLabels}
+              />
             </li>
           ))}
         </ul>

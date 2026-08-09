@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setToken, clearRememberCredentials, setIdleTimeoutMinutes, setRememberPreference, persistRememberCredentials } from './auth';
 
 const API_BASE = '/api';
@@ -27,6 +27,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const detail = err.detail;
     const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : 'Bir hata oluştu';
     throw new Error(message || 'Bir hata oluştu');
+  }
+
+  if (res.status === 204) return {} as T;
+  return res.json();
+}
+
+/** Same as request but preserves HTTP status on failure (DE-3 interpret UX). */
+export class ApiHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+  }
+}
+
+async function requestWithStatus<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && path !== '/auth/login') {
+    clearSessionExpired();
+    window.location.reload();
+    throw new ApiHttpError(401, 'Oturum süresi doldu');
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Bir hata oluştu' }));
+    const detail = err.detail;
+    const message =
+      typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : 'Bir hata oluştu';
+    throw new ApiHttpError(res.status, message || 'Bir hata oluştu');
   }
 
   if (res.status === 204) return {} as T;
@@ -551,6 +593,18 @@ export const api = {
 
   listDiagnoses: (period = 'monthly') =>
     request<DiagnosisListResponse>(`/intelligence/diagnoses?period=${period}`),
+
+  interpretDiagnosis: (body: DiagnosisInterpretRequest) =>
+    requestWithStatus<DiagnosisInterpretResponse>('/ai/diagnosis/interpret', {
+      method: 'POST',
+      body: JSON.stringify({
+        diagnosis_id: body.diagnosis_id,
+        period: body.period,
+        date: body.date ?? null,
+        locale: body.locale ?? 'tr',
+        refresh: body.refresh ?? false,
+      }),
+    }),
 
   sendAiChat: (body: AiChatRequest) =>
     request<AiChatResponse>('/ai/chat', {

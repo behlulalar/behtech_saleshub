@@ -354,6 +354,7 @@ export interface AiStatusResponse {
   agent_runs_available?: boolean;
   daily_email_enabled?: boolean;
   chat_available?: boolean;
+  diagnosis_interpret_available?: boolean;
 }
 
 export interface IntelligenceInsightItem {
@@ -414,6 +415,38 @@ export interface DiagnosisListResponse {
   period_type: string;
   anchor: string;
   items: DiagnosisItem[];
+}
+
+export interface DiagnosisRecommendedAction {
+  title: string;
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface DiagnosisInterpretation {
+  summary: string;
+  why_it_matters: string;
+  key_findings: string[];
+  recommended_actions: DiagnosisRecommendedAction[];
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface DiagnosisInterpretRequest {
+  diagnosis_id: string;
+  period: string;
+  date?: string | null;
+  locale?: string;
+  refresh?: boolean;
+}
+
+export interface DiagnosisInterpretResponse {
+  diagnosis_id: string;
+  interpretation: DiagnosisInterpretation | null;
+  run_id: number | null;
+  cached: boolean;
+  context_fingerprint: string | null;
+  disclaimer: string;
+  error_code: string | null;
 }
 
 export interface SummarizeLeadRequest {

@@ -6,11 +6,22 @@ import json
 
 from ai.capabilities.chat import run_sales_chat
 from ai.capabilities.chat_stream import iter_sales_chat_events
+from ai.capabilities.diagnosis_interpreter import (
+    DiagnosisInterpretDisabledError,
+    DiagnosisNotFoundError,
+    run_diagnosis_interpret,
+)
 from ai.capabilities.priorities import run_priorities
 from ai.capabilities.suggest_message import run_suggest_message
 from ai.capabilities.summarize_lead import run_summarize_lead
-from ai.deps import ai_is_configured, get_ai_context, require_ai_enabled, require_chat_enabled
-from ai.llm_client import AiNotConfiguredError
+from ai.deps import (
+    ai_is_configured,
+    diagnosis_interpret_available,
+    get_ai_context,
+    require_ai_enabled,
+    require_chat_enabled,
+)
+from ai.llm_client import AiNotConfiguredError, DiagnosisOpenAiRequiredError
 from ai.run_worker import execute_run, process_pending_runs
 from ai.store import create_queued_run, get_run_for_org, list_runs_for_org, run_to_api_dict
 from ai.usage import usage_summary
@@ -31,6 +42,8 @@ from schemas import (
     SuggestMessageResponse,
     SummarizeLeadRequest,
     SummarizeLeadResponse,
+    DiagnosisInterpretRequest,
+    DiagnosisInterpretResponse,
     IntelligenceInsightItem,
 )
 
@@ -47,6 +60,7 @@ def get_ai_status(
     enabled = settings.ai_enabled
     token_ok = enabled and configured and usage["tokens_remaining"] > 0
     chat_ok = token_ok and settings.ai_chat_enabled
+    de3_ok = diagnosis_interpret_available(db, org_id)
     return AiStatusResponse(
         enabled=enabled,
         configured=configured,
@@ -62,6 +76,7 @@ def get_ai_status(
         agent_runs_available=token_ok,
         daily_email_enabled=enabled and settings.ai_daily_email and configured,
         chat_available=chat_ok,
+        diagnosis_interpret_available=de3_ok,
     )
 
 
@@ -155,6 +170,38 @@ def priorities(
         run_id=run_id or 0,
         cached=cached,
     )
+
+
+@router.post("/diagnosis/interpret", response_model=DiagnosisInterpretResponse)
+def diagnosis_interpret(
+    body: DiagnosisInterpretRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    require_ai_enabled()
+    db, user, org_id = ctx
+    try:
+        result = run_diagnosis_interpret(
+            db,
+            user=user,
+            org_id=org_id,
+            diagnosis_id=body.diagnosis_id,
+            period=body.period,
+            date_param=body.date,
+            locale=body.locale or "tr",
+            refresh=body.refresh,
+        )
+    except DiagnosisInterpretDisabledError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiagnosisNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teşhis bulunamadı") from exc
+    except DiagnosisOpenAiRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Teşhis yorumu oluşturulamadı") from exc
+
+    return DiagnosisInterpretResponse(**result)
 
 
 @router.post("/runs", response_model=AiRunCreateResponse)

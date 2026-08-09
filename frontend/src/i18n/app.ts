@@ -267,6 +267,38 @@ export interface AppCopy {
     runTypeAgent: string;
     runStatusDone: string;
     runStatusFailed: string;
+    diagnosisInterpretButton: string;
+    diagnosisInterpretLoading: string;
+    diagnosisInterpretUnavailable: string;
+    diagnosisInterpretNotFound: string;
+    diagnosisInterpretQuota: string;
+    diagnosisInterpretInvalidOutput: string;
+    diagnosisInterpretGenericError: string;
+    diagnosisInterpretCachedBadge: string;
+    diagnosisInterpretSummary: string;
+    diagnosisInterpretWhy: string;
+    diagnosisInterpretFindings: string;
+    diagnosisInterpretActions: string;
+    diagnosisInterpretConfidence: string;
+    diagnosisInterpretHide: string;
+    diagnosisInterpretDisabledTitle: string;
+    diagnosisInterpretStatusLoading: string;
+  };
+  salesDiagnoses: {
+    title: string;
+    subtitle: string;
+    loadFailed: string;
+    empty: string;
+    noLeadPriorityList: string;
+    impactDistribution: string;
+    impactHigh: string;
+    impactMedium: string;
+    impactLow: string;
+    openLead: string;
+    scoreLabel: string;
+    daysSuffix: string;
+    offerAgeSuffix: string;
+    diagnosisModifierSuffix: string;
   };
   companyIntel: {
     title: string;
@@ -767,6 +799,40 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       runTypeAgent: 'Asistan',
       runStatusDone: 'Tamamlandı',
       runStatusFailed: 'Başarısız',
+      diagnosisInterpretButton: 'AI Yorumu',
+      diagnosisInterpretLoading: 'AI yorumu hazırlanıyor…',
+      diagnosisInterpretUnavailable: 'AI yorumu şu anda kullanılamıyor.',
+      diagnosisInterpretNotFound: 'Bu teşhis artık mevcut değil.',
+      diagnosisInterpretQuota: 'AI kullanım kotası dolmuş.',
+      diagnosisInterpretInvalidOutput:
+        'AI yorumu oluşturulamadı. Teşhis verileri yine kullanılabilir.',
+      diagnosisInterpretGenericError: 'AI yorumu oluşturulurken bir hata oluştu.',
+      diagnosisInterpretCachedBadge: 'Önbellekten',
+      diagnosisInterpretSummary: 'Özet',
+      diagnosisInterpretWhy: 'Neden önemli?',
+      diagnosisInterpretFindings: 'Öne çıkan bulgular',
+      diagnosisInterpretActions: 'Önerilen aksiyonlar',
+      diagnosisInterpretConfidence: 'Güven seviyesi',
+      diagnosisInterpretHide: 'Yorumu gizle',
+      diagnosisInterpretDisabledTitle: 'AI yorumu şu anda kullanılamıyor',
+      diagnosisInterpretStatusLoading: 'AI durumu kontrol ediliyor…',
+    },
+    salesDiagnoses: {
+      title: 'Satış teşhisleri',
+      subtitle:
+        'Deterministik kurallar (LLM yok). Öncelik: mevcut lead skoru + lead\'e özel teşhis.',
+      loadFailed: 'Teşhisler yüklenemedi',
+      empty: 'Şu an tetiklenen teşhis yok — veriler normal görünüyor.',
+      noLeadPriorityList: 'Bu teşhis için lead bazlı öncelik listesi yok.',
+      impactDistribution: 'Öncelik dağılımı:',
+      impactHigh: 'yüksek',
+      impactMedium: 'orta',
+      impactLow: 'düşük',
+      openLead: 'Aç',
+      scoreLabel: 'Skor',
+      daysSuffix: 'gün',
+      offerAgeSuffix: 'teklif',
+      diagnosisModifierSuffix: 'teşhis',
     },
     companyIntel: {
       title: 'Şirket özeti (Intelligence)',
@@ -1282,6 +1348,40 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       runTypeAgent: 'Assistant',
       runStatusDone: 'Done',
       runStatusFailed: 'Failed',
+      diagnosisInterpretButton: 'AI insight',
+      diagnosisInterpretLoading: 'Preparing AI insight…',
+      diagnosisInterpretUnavailable: 'AI insight is not available right now.',
+      diagnosisInterpretNotFound: 'This diagnosis is no longer available.',
+      diagnosisInterpretQuota: 'AI usage quota exceeded.',
+      diagnosisInterpretInvalidOutput:
+        'Could not generate AI insight. Diagnosis data is still available.',
+      diagnosisInterpretGenericError: 'Something went wrong while generating AI insight.',
+      diagnosisInterpretCachedBadge: 'From cache',
+      diagnosisInterpretSummary: 'Summary',
+      diagnosisInterpretWhy: 'Why it matters',
+      diagnosisInterpretFindings: 'Key findings',
+      diagnosisInterpretActions: 'Recommended actions',
+      diagnosisInterpretConfidence: 'Confidence',
+      diagnosisInterpretHide: 'Hide insight',
+      diagnosisInterpretDisabledTitle: 'AI insight is not available right now',
+      diagnosisInterpretStatusLoading: 'Checking AI availability…',
+    },
+    salesDiagnoses: {
+      title: 'Sales diagnoses',
+      subtitle:
+        'Deterministic rules (no LLM). Priority: existing lead score + diagnosis-specific signal.',
+      loadFailed: 'Could not load diagnoses',
+      empty: 'No active diagnoses — data looks normal.',
+      noLeadPriorityList: 'No lead-level priority list for this diagnosis.',
+      impactDistribution: 'Priority mix:',
+      impactHigh: 'high',
+      impactMedium: 'medium',
+      impactLow: 'low',
+      openLead: 'Open',
+      scoreLabel: 'Score',
+      daysSuffix: 'd',
+      offerAgeSuffix: 'offer',
+      diagnosisModifierSuffix: 'diagnosis',
     },
     companyIntel: {
       title: 'Company snapshot (Intelligence)',

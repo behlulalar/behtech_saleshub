@@ -91,6 +91,16 @@ class Settings(BaseSettings):
     ai_rate_limit: str = "20/minute"
     ai_daily_email: bool = False
     ai_chat_enabled: bool = False
+    ai_provider: str = "openai"
+    """Primary LLM vendor for general AI features (openai|azure). DE-3 interpret always uses OpenAI API only."""
+    # DE-3: AI Diagnosis Interpreter (POST /api/ai/diagnosis/interpret)
+    ai_diagnosis_interpret_enabled: bool = False
+    ai_diagnosis_model: str = ""
+    """OpenAI model id for diagnosis interpret; empty uses openai_chat_model. Azure: deployment name override if set."""
+    ai_diagnosis_interpret_cache_ttl_hours: int = 48
+    ai_diagnosis_interpret_max_output_tokens: int = 450
+    ai_diagnosis_interpret_temperature: float = 0.2
+    ai_diagnosis_interpret_estimated_tokens: int = 1200
 
     model_config = SettingsConfigDict(env_file=".env")
 

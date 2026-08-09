@@ -672,6 +672,7 @@ class AiStatusResponse(BaseModel):
     agent_runs_available: bool = False
     daily_email_enabled: bool = False
     chat_available: bool = False
+    diagnosis_interpret_available: bool = False
 
 
 class AiChatHistoryItem(BaseModel):
@@ -790,6 +791,47 @@ class DiagnosisListResponse(BaseModel):
     period_type: str
     anchor: str
     items: list[DiagnosisItem] = Field(default_factory=list)
+
+
+class DiagnosisRecommendedAction(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=400)
+    priority: Literal["high", "medium", "low"]
+
+
+class DiagnosisInterpretation(BaseModel):
+    summary: str = Field(min_length=1, max_length=600)
+    why_it_matters: str = Field(min_length=1, max_length=600)
+    key_findings: list[str] = Field(default_factory=list, max_length=5)
+    recommended_actions: list[DiagnosisRecommendedAction] = Field(default_factory=list, max_length=5)
+    confidence: Literal["high", "medium", "low"]
+
+    @model_validator(mode="after")
+    def _trim_findings(self) -> "DiagnosisInterpretation":
+        self.key_findings = [s.strip() for s in self.key_findings if s and s.strip()][:5]
+        return self
+
+
+class DiagnosisInterpretRequest(BaseModel):
+    diagnosis_id: str = Field(min_length=1, max_length=80)
+    period: str = Field(default="monthly", pattern="^(daily|weekly|monthly)$")
+    date: str | None = Field(
+        default=None,
+        max_length=32,
+        description="YYYY-MM-DD veya monthly için YYYY-MM",
+    )
+    locale: str = Field(default="tr", max_length=8)
+    refresh: bool = False
+
+
+class DiagnosisInterpretResponse(BaseModel):
+    diagnosis_id: str
+    interpretation: DiagnosisInterpretation | None = None
+    run_id: int | None = None
+    cached: bool = False
+    context_fingerprint: str | None = None
+    disclaimer: str = ""
+    error_code: str | None = None
 
 
 class SummarizeLeadRequest(BaseModel):

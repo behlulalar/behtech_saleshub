@@ -3,7 +3,12 @@ from collections.abc import Iterator
 import httpx
 from openai import AzureOpenAI, OpenAI
 
-from ai.llm_config import provider_and_model, uses_azure_openai, uses_openai_api
+from ai.llm_config import (
+    diagnosis_provider_and_model,
+    provider_and_model,
+    uses_azure_openai,
+    uses_openai_api,
+)
 from config import settings
 
 
@@ -11,11 +16,24 @@ class AiNotConfiguredError(RuntimeError):
     pass
 
 
+class DiagnosisOpenAiRequiredError(AiNotConfiguredError):
+    """DE-3 interpret requires direct OpenAI API; Azure is not used."""
+
+
 def assert_llm_configured() -> None:
     if not settings.ai_enabled:
         raise AiNotConfiguredError("AI disabled")
     if not uses_openai_api() and not uses_azure_openai():
         raise AiNotConfiguredError("OpenAI or Azure OpenAI not configured")
+
+
+def assert_diagnosis_openai_configured() -> None:
+    if not settings.ai_enabled:
+        raise AiNotConfiguredError("AI disabled")
+    if not uses_openai_api():
+        raise DiagnosisOpenAiRequiredError(
+            "Teşhis yorumu için OpenAI gerekli (OPENAI_API_KEY). Azure bu özellikte kullanılmaz."
+        )
 
 
 def chat_completion(*, system: str, user: str) -> tuple[str, dict]:
@@ -113,6 +131,17 @@ def _openai_client():
     )
 
 
+def _openai_direct_client() -> OpenAI:
+    """DE-3 only: direct OpenAI API (never AzureOpenAI)."""
+    timeout = settings.ai_llm_timeout_sec
+    http_client = httpx.Client(timeout=timeout)
+    return OpenAI(
+        api_key=settings.openai_api_key,
+        timeout=timeout,
+        http_client=http_client,
+    )
+
+
 def stream_chat_completion_messages(
     *,
     messages: list[dict],
@@ -142,3 +171,61 @@ def stream_chat_completion_messages(
         delta = chunk.choices[0].delta.content
         if delta:
             yield delta
+
+
+def strip_llm_json_content(text: str) -> str:
+    """Remove optional markdown fences from model output before JSON parse."""
+    s = (text or "").strip()
+    if not s.startswith("```"):
+        return s
+    lines = s.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _usage_from_response(response) -> dict:
+    usage_obj = response.usage
+    return {
+        "prompt_tokens": getattr(usage_obj, "prompt_tokens", None) if usage_obj else None,
+        "completion_tokens": getattr(usage_obj, "completion_tokens", None) if usage_obj else None,
+        "total_tokens": getattr(usage_obj, "total_tokens", None) if usage_obj else None,
+    }
+
+
+def chat_completion_structured(
+    *,
+    system: str,
+    user: str,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    model: str | None = None,
+) -> tuple[str, dict]:
+    """
+    Chat completion with JSON object response (DE-3 diagnosis interpret).
+    Always uses direct OpenAI API; never AzureOpenAI.
+    Does not alter existing chat_completion / chat_completion_messages behavior.
+    """
+    assert_diagnosis_openai_configured()
+    _provider, resolved_model = diagnosis_provider_and_model()
+    assert _provider == "openai"
+    resolved_model = model or resolved_model
+    temp = settings.ai_diagnosis_interpret_temperature if temperature is None else temperature
+    max_out = settings.ai_diagnosis_interpret_max_output_tokens if max_tokens is None else max_tokens
+
+    client = _openai_direct_client()
+    create_kwargs: dict = {
+        "model": resolved_model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "max_tokens": max_out,
+        "temperature": temp,
+        "response_format": {"type": "json_object"},
+    }
+    response = client.chat.completions.create(**create_kwargs)
+    choice = response.choices[0].message.content or ""
+    return strip_llm_json_content(choice), _usage_from_response(response)
