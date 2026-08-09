@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'crm_dashboard_sections_v1';
 
-type SectionId = 'aiPriorities' | 'awaitingReply';
+type SectionId = 'aiPriorities' | 'awaitingReply' | 'automationNotifications';
 
 type Stored = Partial<Record<SectionId, boolean>>;
 

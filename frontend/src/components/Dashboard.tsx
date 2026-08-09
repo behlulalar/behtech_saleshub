@@ -587,28 +587,53 @@ function AutomationList({
   onEdit: (leadId: number) => void;
   editTitle: string;
 }) {
+  const [open, setOpen] = useState(() => readDashboardSectionOpen('automationNotifications'));
+
   return (
     <div className="card overflow-hidden border-brand-100">
-      <div className="flex items-center gap-2 border-b border-surface-200 bg-brand-50/40 px-3 py-2.5 lg:px-4 lg:py-3">
-        <Bell size={16} className="text-brand-500" />
-        <h3 className="text-xs font-semibold text-surface-900 lg:text-sm">{title}</h3>
-        <span className="rounded-full bg-white px-2 py-0.5 text-xs text-surface-800/60">{items.length}</span>
+      <div className="border-b border-surface-200 bg-brand-50/40 px-3 py-2 lg:px-4 lg:py-2.5">
+        <button
+          type="button"
+          onClick={() =>
+            setOpen((v) => {
+              const next = !v;
+              writeDashboardSectionOpen('automationNotifications', next);
+              return next;
+            })
+          }
+          className="flex w-full items-center gap-2 rounded-lg text-left transition hover:bg-brand-50/80 lg:gap-2.5"
+          aria-expanded={open}
+        >
+          <Bell size={16} className="shrink-0 text-brand-500" />
+          <h3 className="min-w-0 flex-1 text-xs font-semibold text-surface-900 lg:text-sm">{title}</h3>
+          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium tabular-nums text-surface-800/60">
+            {items.length}
+          </span>
+          <span className="shrink-0 text-surface-800/40" aria-hidden>
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </span>
+        </button>
       </div>
-      <div className="divide-y divide-surface-100">
-        {items.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-surface-800/40">{emptyText}</p>
-        ) : (
-          items.map((item) => (
-            <div key={`${item.kind}-${item.id}-${item.message}`} className="flex items-start gap-2 px-3.5 py-2.5 lg:px-4 lg:py-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-surface-900">{item.message}</p>
-                <p className="mt-0.5 text-xs text-surface-800/50">{item.category_label}</p>
+      {open ? (
+        <div className="divide-y divide-surface-100">
+          {items.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-surface-800/40">{emptyText}</p>
+          ) : (
+            items.map((item) => (
+              <div
+                key={`${item.kind}-${item.id}-${item.message}`}
+                className="flex items-start gap-2 px-3.5 py-2.5 lg:px-4 lg:py-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-surface-900">{item.message}</p>
+                  <p className="mt-0.5 text-xs text-surface-800/50">{item.category_label}</p>
+                </div>
+                <EditButton onClick={() => onEdit(item.id)} title={editTitle} />
               </div>
-              <EditButton onClick={() => onEdit(item.id)} title={editTitle} />
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
