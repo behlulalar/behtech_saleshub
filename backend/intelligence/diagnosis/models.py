@@ -20,6 +20,9 @@ class DiagnosisResult:
     evidence: dict[str, Any] = field(default_factory=dict)
     affected_lead_count: int = 0
     detected_at: str = ""
+    affected_leads_available: bool = True
+    impact: dict[str, Any] = field(default_factory=dict)
+    top_priority_leads: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -162,7 +162,7 @@ export default function Dashboard({
       </div>
 
       <CompanyIntelligenceCard isOwner={isOwner} />
-      <SalesDiagnosesCard />
+      <SalesDiagnosesCard onEditLead={onEditLead} />
 
       <AiPriorityList
         isOwner={isOwner}

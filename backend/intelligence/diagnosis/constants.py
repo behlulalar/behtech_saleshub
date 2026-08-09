@@ -32,3 +32,14 @@ OFFER_OLD_DAYS_MEDIUM = 5
 OFFER_OLD_DAYS_HIGH = 10
 OFFER_MIN_PENDING_WITH_AGE = 2
 """Minimum pending offers with reliable age to emit offer diagnosis."""
+
+# --- DE-2 priority (aligned with rank_leads_for_org score bands) ---
+
+PRIORITY_BAND_HIGH = 70
+PRIORITY_BAND_MEDIUM = 45
+
+DE2_TOP_LEADS_LIMIT = 10
+
+NO_CONTACT_MODIFIER = 8
+OFFER_AGE_MODIFIER_MEDIUM = 6
+OFFER_AGE_MODIFIER_HIGH = 12

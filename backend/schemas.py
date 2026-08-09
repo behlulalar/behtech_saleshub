@@ -745,6 +745,26 @@ class IntelligenceInsightsResponse(BaseModel):
     items: list[IntelligenceInsightItem]
 
 
+class DiagnosisImpact(BaseModel):
+    high_priority_count: int = 0
+    medium_priority_count: int = 0
+    low_priority_count: int = 0
+    estimated_pipeline_value: float | None = None
+
+
+class DiagnosisPriorityLead(BaseModel):
+    lead_id: int
+    lead_name: str
+    durum: str
+    existing_lead_score: int
+    diagnosis_modifier: int
+    diagnosis_priority_score: int
+    priority: str
+    reason_codes: list[str] = Field(default_factory=list)
+    idle_days: int | None = None
+    offer_age_days: int | None = None
+
+
 class DiagnosisItem(BaseModel):
     diagnosis_id: str
     type: str
@@ -758,6 +778,9 @@ class DiagnosisItem(BaseModel):
     evidence: dict = Field(default_factory=dict)
     affected_lead_count: int = 0
     detected_at: str = ""
+    affected_leads_available: bool = True
+    impact: DiagnosisImpact = Field(default_factory=DiagnosisImpact)
+    top_priority_leads: list[DiagnosisPriorityLead] = Field(default_factory=list)
 
 
 class DiagnosisListResponse(BaseModel):

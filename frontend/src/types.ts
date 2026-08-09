@@ -369,6 +369,26 @@ export interface IntelligenceInsightItem {
   created_at: string;
 }
 
+export interface DiagnosisImpact {
+  high_priority_count: number;
+  medium_priority_count: number;
+  low_priority_count: number;
+  estimated_pipeline_value?: number | null;
+}
+
+export interface DiagnosisPriorityLead {
+  lead_id: number;
+  lead_name: string;
+  durum: string;
+  existing_lead_score: number;
+  diagnosis_modifier: number;
+  diagnosis_priority_score: number;
+  priority: string;
+  reason_codes?: string[];
+  idle_days?: number | null;
+  offer_age_days?: number | null;
+}
+
 export interface DiagnosisItem {
   diagnosis_id: string;
   type: string;
@@ -382,6 +402,9 @@ export interface DiagnosisItem {
   evidence?: Record<string, unknown>;
   affected_lead_count: number;
   detected_at: string;
+  affected_leads_available?: boolean;
+  impact?: DiagnosisImpact;
+  top_priority_leads?: DiagnosisPriorityLead[];
 }
 
 export interface DiagnosisListResponse {
