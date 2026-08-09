@@ -20,7 +20,9 @@ from intelligence.diagnosis.priority import (
     lead_specific_modifier,
     priority_band,
 )
-from intelligence.diagnosis.affected import AffectedCandidate
+from intelligence.diagnosis.affected import AffectedCandidate, collect_follow_up_affected
+from intelligence.diagnosis.impact import compute_impact, empty_impact
+from intelligence.scoring import score_lead
 
 
 def _lead(
@@ -138,6 +140,63 @@ def test_enrich_funnel_no_priority_leads():
     assert item.affected_leads_available is False
     assert item.top_priority_leads == []
     assert item.impact["estimated_pipeline_value"] is None
+    assert item.impact["affected_lead_count"] == 0
+
+
+def test_compute_impact_affected_lead_count_matches_band_sum():
+    rows = [
+        {"priority": "high"},
+        {"priority": "high"},
+        {"priority": "medium"},
+        {"priority": "low"},
+    ]
+    impact = compute_impact(rows)
+    assert impact["affected_lead_count"] == len(rows)
+    assert impact["affected_lead_count"] == (
+        impact["high_priority_count"]
+        + impact["medium_priority_count"]
+        + impact["low_priority_count"]
+    )
+
+
+def test_empty_impact_affected_lead_count_zero():
+    assert empty_impact()["affected_lead_count"] == 0
+
+
+def test_no_contact_lead_score_lead_plus_no_contact_modifier_only(monkeypatch):
+    """DE-1 no_contact cohort; severity does not alter score; modifier is +8 only."""
+    db = MagicMock()
+    today = date(2026, 8, 10)
+    monkeypatch.setattr("intelligence.diagnosis.affected.local_today", lambda: today)
+    monkeypatch.setattr("intelligence.scoring.local_today", lambda: today)
+
+    lead = _lead(1, "Yeni", created=date(2026, 8, 1))
+    with patch("intelligence.diagnosis.rules.get_last_activity_dates", return_value={}):
+        from intelligence.diagnosis.rules import detect_follow_up_problems
+
+        diagnoses = detect_follow_up_problems(db, 1, [lead], activity_dates={})
+    assert len(diagnoses) == 1
+    assert diagnoses[0].evidence["no_contact_count"] == 1
+
+    candidates = collect_follow_up_affected(db, 1, [lead], activity_dates={}, today=today)
+    assert len(candidates) == 1
+    assert candidates[0].follow_reason == "no_contact"
+
+    existing, _reasons, _action = score_lead(db, 1, lead, today=today, activity_dates={})
+    rows = build_priority_rows(
+        db,
+        1,
+        candidates,
+        diagnosis_type="follow_up",
+        diagnosis_severity="high",
+        activity_dates={},
+    )
+    row = rows[0]
+    assert row["existing_lead_score"] == existing
+    assert row["diagnosis_modifier"] == NO_CONTACT_MODIFIER
+    assert row["diagnosis_priority_score"] == existing + NO_CONTACT_MODIFIER
+    assert row["diagnosis_priority_score"] == existing + 8
+    assert "diagnosis_high" in row["reason_codes"]
 
 
 def test_enrich_follow_up_sets_impact_and_top(monkeypatch):

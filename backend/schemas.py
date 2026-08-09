@@ -746,6 +746,7 @@ class IntelligenceInsightsResponse(BaseModel):
 
 
 class DiagnosisImpact(BaseModel):
+    affected_lead_count: int = 0
     high_priority_count: int = 0
     medium_priority_count: int = 0
     low_priority_count: int = 0

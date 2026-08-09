@@ -52,8 +52,16 @@ def compute_diagnoses(
 
     started = time.perf_counter()
     leads = db.query(Lead).filter(Lead.user_id == org_id).all()
-    activity_dates = _batch_activity_dates(db, org_id, leads)
-    offer_given_dates = _batch_offer_dates(db, org_id, leads)
+
+    run_follow_up = diagnosis_type is None or diagnosis_type == "follow_up"
+    run_offer = diagnosis_type is None or diagnosis_type == "offer"
+
+    activity_dates: dict[int, date] = (
+        _batch_activity_dates(db, org_id, leads) if run_follow_up else {}
+    )
+    offer_given_dates: dict[int, date] = (
+        _batch_offer_dates(db, org_id, leads) if run_offer else {}
+    )
     items: list[DiagnosisResult] = []
 
     try:

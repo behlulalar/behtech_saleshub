@@ -121,7 +121,7 @@ export default function SalesDiagnosesCard({ onEditLead }: Props) {
 
               {d.affected_leads_available === false ? (
                 <p className="mt-2 text-xs text-surface-600/70">
-                  Hunu teşhisi — lead bazlı öncelik listesi yok.
+                  Bu teşhis için lead bazlı öncelik listesi yok.
                 </p>
               ) : null}
 

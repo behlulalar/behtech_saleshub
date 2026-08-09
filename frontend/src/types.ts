@@ -370,6 +370,7 @@ export interface IntelligenceInsightItem {
 }
 
 export interface DiagnosisImpact {
+  affected_lead_count: number;
   high_priority_count: number;
   medium_priority_count: number;
   low_priority_count: number;
