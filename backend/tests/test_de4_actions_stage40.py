@@ -31,6 +31,7 @@ from ai.actions.schemas import (
     IdempotencyScope,
     ProposeFollowUpTaskParams,
     ProposeLogActivityParams,
+    ProposeMeetingDateParams,
     ProposePriorityChangeParams,
     validate_idempotency_key,
 )
@@ -162,15 +163,25 @@ def test_registry_closed():
         )
 
 
-def test_executor_stub_does_not_mutate():
+def test_follow_up_executor_is_real():
     ex = get("propose_follow_up_task").executor
+    from ai.actions.executors import FollowUpTaskExecutor
+
+    assert isinstance(ex, FollowUpTaskExecutor)
+
+
+def test_executor_stub_does_not_mutate():
+    ex = get("propose_meeting_date").executor
     from unittest.mock import MagicMock
 
     result = ex.execute(
         db=MagicMock(),
         organization_id=1,
         actor_user_id=1,
-        params=ProposeFollowUpTaskParams(lead_id=1, note="n"),
+        params=ProposeMeetingDateParams(
+            lead_id=1,
+            meeting_date=__import__("datetime").date(2026, 8, 10),
+        ),
     )
     assert result.dry_run is True
     assert result.success is False

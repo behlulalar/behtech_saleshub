@@ -152,6 +152,7 @@ def test_note_duplicate_and_triple_execute(client, owner_lead):
     db = SessionLocal()
     try:
         original = (db.query(Lead).filter(Lead.id == lead.id).first().notlar or "")
+        original_hits = original.count("DE-4 Stage 4.3 not")
     finally:
         db.close()
 
@@ -172,7 +173,7 @@ def test_note_duplicate_and_triple_execute(client, owner_lead):
     db = SessionLocal()
     try:
         row = db.query(Lead).filter(Lead.id == lead.id).first()
-        assert row.notlar.count("DE-4 Stage 4.3 not") == 1
+        assert row.notlar.count("DE-4 Stage 4.3 not") == original_hits + 1
         row.notlar = original
         db.commit()
     finally:
@@ -262,15 +263,19 @@ def test_employee_cannot_propose_note(client, owner_lead):
     assert r.status_code == 403
 
 
-def test_follow_up_still_not_executable(client, owner_lead):
+def test_meeting_still_not_executable(client, owner_lead):
     token, _user, lead = owner_lead
     body = {
-        "action_type": "propose_follow_up_task",
+        "action_type": "propose_meeting_date",
         "target_entity": "lead",
         "target_entity_id": lead.id,
-        "parameters": {"lead_id": lead.id, "note": "x"},
+        "parameters": {
+            "lead_id": lead.id,
+            "meeting_date": "2026-08-15",
+            "meeting_time": "",
+        },
         "reason": "t",
-        "idempotency_key": f"fu-{uuid.uuid4().hex[:12]}",
+        "idempotency_key": f"mt-{uuid.uuid4().hex[:12]}",
     }
     r = client.post("/api/ai/actions/propose", json=body, headers={"Authorization": f"Bearer {token}"})
     action_id = r.json()["action_id"]

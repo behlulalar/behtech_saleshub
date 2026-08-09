@@ -249,10 +249,14 @@ def test_proposed_execute_rejected(client, owner_lead):
 def test_execute_stub_action_rejected(client, owner_lead):
     token, _user, lead = owner_lead
     body = {
-        "action_type": "propose_follow_up_task",
+        "action_type": "propose_meeting_date",
         "target_entity": "lead",
         "target_entity_id": lead.id,
-        "parameters": {"lead_id": lead.id, "note": "x"},
+        "parameters": {
+            "lead_id": lead.id,
+            "meeting_date": "2026-09-01",
+            "meeting_time": "",
+        },
         "reason": "t",
         "idempotency_key": f"stub-{uuid.uuid4().hex[:12]}",
     }

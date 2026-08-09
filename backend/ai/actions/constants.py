@@ -25,5 +25,5 @@ TARGET_ENTITY_LEAD = "lead"
 
 # Stage 4.2+ — action types allowed to perform CRM mutation on execute (after approve).
 EXECUTE_V1_ACTION_TYPES: frozenset[str] = frozenset(
-    {"propose_log_activity", "propose_note_append"}
+    {"propose_log_activity", "propose_note_append", "propose_follow_up_task"}
 )

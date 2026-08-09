@@ -7,7 +7,14 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ai.actions.executors import ActionExecutor, BlockedExecutor, LogActivityExecutor, NoteAppendExecutor, StubExecutor
+from ai.actions.executors import (
+    ActionExecutor,
+    BlockedExecutor,
+    FollowUpTaskExecutor,
+    LogActivityExecutor,
+    NoteAppendExecutor,
+    StubExecutor,
+)
 from ai.actions.policies import ActionPolicy, PermissionClass
 from ai.actions.schemas import PARAM_MODEL_BY_TYPE
 
@@ -122,6 +129,8 @@ def _build_registry() -> dict[str, ActionDefinition]:
             executor: ActionExecutor = LogActivityExecutor(action_type=action_type)
         elif action_type == "propose_note_append":
             executor = NoteAppendExecutor(action_type=action_type)
+        elif action_type == "propose_follow_up_task":
+            executor = FollowUpTaskExecutor(action_type=action_type)
         else:
             executor = StubExecutor(action_type=action_type)
         entries.append(

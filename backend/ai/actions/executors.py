@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from activities import ACTIVITY_TYPES, log_activity
-from ai.actions.schemas import ProposeLogActivityParams, ProposeNoteAppendParams
+from ai.actions.schemas import ProposeFollowUpTaskParams, ProposeLogActivityParams, ProposeNoteAppendParams
+from app_timezone import local_today
 from database import Lead
+from intelligence.proposal_effects import _first_free_takip_slot
 
 
 class ActionExecutionNotImplementedError(RuntimeError):
@@ -77,6 +79,83 @@ class LogActivityExecutor(ActionExecutor):
             message="activity_created",
             dry_run=False,
             activity_id=activity.id,
+        )
+
+
+class FollowUpTaskExecutor(ActionExecutor):
+    """Stage 4.9 — schedule follow-up on Lead.takip_1 / takip_2 (same CRM model as Faz 6)."""
+
+    def execute(
+        self,
+        *,
+        db: Session,
+        organization_id: int,
+        actor_user_id: int,
+        params: BaseModel,
+        **_: Any,
+    ) -> ExecuteResult:
+        if not isinstance(params, ProposeFollowUpTaskParams):
+            raise TypeError("invalid_params_type")
+        lead = (
+            db.query(Lead)
+            .filter(Lead.id == params.lead_id, Lead.user_id == organization_id)
+            .first()
+        )
+        if not lead:
+            raise ValueError("lead_not_found")
+
+        today_iso = local_today().isoformat()
+        slot = _first_free_takip_slot(lead, today_iso)
+        note = (params.note or "").strip()
+        if slot:
+            effect = "Bugün için takip görevi planlandı"
+            description = f"{note}: {effect} ({slot})" if note else f"{effect} ({slot})"
+            activity = log_activity(
+                db,
+                user_id=actor_user_id,
+                lead_id=lead.id,
+                activity_type="takip_yapildi",
+                title="DE-4 takip görevi",
+                description=description[:2000],
+            )
+            db.flush()
+            return ExecuteResult(
+                success=True,
+                message="follow_up_task_scheduled",
+                dry_run=False,
+                activity_id=activity.id,
+                result_payload={
+                    "lead_id": lead.id,
+                    "takip_field": slot,
+                    "scheduled_date": today_iso,
+                    "task_scheduled": True,
+                    "action_type": self.action_type,
+                },
+            )
+
+        effect = "Takip alanları dolu — manuel planlayın"
+        description = f"{note}: {effect}" if note else effect
+        activity = log_activity(
+            db,
+            user_id=actor_user_id,
+            lead_id=lead.id,
+            activity_type="diger",
+            title="DE-4 takip görevi",
+            description=description[:2000],
+        )
+        db.flush()
+        return ExecuteResult(
+            success=True,
+            message="follow_up_slots_full",
+            dry_run=False,
+            activity_id=activity.id,
+            result_payload={
+                "lead_id": lead.id,
+                "takip_field": None,
+                "scheduled_date": None,
+                "task_scheduled": False,
+                "action_type": self.action_type,
+            },
         )
 
 
