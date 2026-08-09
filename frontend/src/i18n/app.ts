@@ -239,6 +239,7 @@ export interface AppCopy {
     prioritiesRefresh: string;
     prioritiesFailed: string;
     prioritiesEmpty: string;
+    prioritiesOpenLead: string;
     scoreLabel: string;
     batchScoreTitle: string;
     batchScoreHint: string;
@@ -798,6 +799,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       prioritiesRefresh: 'Listeyi yenile',
       prioritiesFailed: 'Öncelik listesi alınamadı',
       prioritiesEmpty: 'Şu an öncelikli lead yok.',
+      prioritiesOpenLead: 'Lead detayını aç',
       scoreLabel: 'Skor',
       batchScoreTitle: 'Toplu skor güncelleme',
       batchScoreHint:
@@ -1378,6 +1380,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       prioritiesRefresh: 'Refresh list',
       prioritiesFailed: 'Could not load priorities',
       prioritiesEmpty: 'No priority leads right now.',
+      prioritiesOpenLead: 'Open lead detail',
       scoreLabel: 'Score',
       batchScoreTitle: 'Batch score refresh',
       batchScoreHint:
