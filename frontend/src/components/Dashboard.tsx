@@ -27,6 +27,7 @@ import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
 import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
 import AiActionProposals from './ai/AiActionProposals';
 import AiDe4ActionsInbox from './ai/AiDe4ActionsInbox';
+import { readDashboardSectionOpen, writeDashboardSectionOpen } from '../utils/dashboardSectionPrefs';
 
 interface Props {
   data: DashboardData | null;
@@ -470,14 +471,20 @@ function ReminderList({
   lastLabel: string;
   editTitle: string;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => readDashboardSectionOpen('awaitingReply'));
 
   return (
     <div className="card overflow-hidden border-orange-200">
       <div className="border-b border-orange-100 bg-orange-50 px-3 py-2 lg:px-4 lg:py-2.5">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() =>
+            setOpen((v) => {
+              const next = !v;
+              writeDashboardSectionOpen('awaitingReply', next);
+              return next;
+            })
+          }
           className="flex w-full items-center gap-2 rounded-lg text-left transition hover:bg-orange-100/50 lg:gap-2.5"
           aria-expanded={open}
         >

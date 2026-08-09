@@ -13,6 +13,7 @@ import { useLocale } from '../../i18n/locale';
 import type { PriorityRecommendation } from '../../types';
 import StatusBadge from '../StatusBadge';
 import { aiPriorityBadgeClass, aiPriorityLabel } from './aiPriorityUi';
+import { readDashboardSectionOpen, writeDashboardSectionOpen } from '../../utils/dashboardSectionPrefs';
 
 const CACHE_KEY = 'crm_ai_priorities_v1';
 
@@ -52,7 +53,7 @@ export default function AiPriorityList({ isOwner, onOpenLead, onProposalQueued }
   const [enabled, setEnabled] = useState(false);
   const [queueBusy, setQueueBusy] = useState<number | null>(null);
   const [queueOk, setQueueOk] = useState<number | null>(null);
-  const [sectionOpen, setSectionOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(() => readDashboardSectionOpen('aiPriorities'));
   const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -126,7 +127,13 @@ export default function AiPriorityList({ isOwner, onOpenLead, onProposalQueued }
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => setSectionOpen((open) => !open)}
+            onClick={() =>
+              setSectionOpen((open) => {
+                const next = !open;
+                writeDashboardSectionOpen('aiPriorities', next);
+                return next;
+              })
+            }
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left transition hover:bg-white/50 sm:gap-3 sm:px-1 sm:py-0.5"
             aria-expanded={sectionOpen}
           >
