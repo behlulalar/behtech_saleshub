@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogOut, Menu, User } from 'lucide-react';
-import { api } from './api';
+import { api, saveAuth } from './api';
 import { clearAuth, getIdleTimeoutMinutes, getUsername, isAuthenticated, isRememberMe, setIdleTimeoutMinutes } from './auth';
 import { useIdleTimeout } from './hooks/useIdleTimeout';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
@@ -95,6 +95,7 @@ function App() {
   const verifyToken = path === '/verify-email' ? urlToken : null;
   const resetToken = path === '/reset-password' ? urlToken : null;
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
+  const [authRestoring, setAuthRestoring] = useState(() => !isAuthenticated());
   const [username, setUsername] = useState(getUsername() || '');
   const [userEmail, setUserEmail] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -201,12 +202,40 @@ function App() {
     }
   }, [publicRoute]);
 
-  const handleLogout = useCallback((reason?: string) => {
+  const handleLogout = useCallback(async (reason?: string) => {
+    try {
+      await api.logout();
+    } catch {
+      /* ignore */
+    }
     clearAuth();
     setAuthenticated(false);
     if (reason) setIdleMessage(reason);
     navigateTo('landing');
   }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      setAuthRestoring(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.refreshSession();
+        if (cancelled) return;
+        saveAuth(res, true);
+        setAuthenticated(true);
+      } catch {
+        /* no persistent session */
+      } finally {
+        if (!cancelled) setAuthRestoring(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
 
   useIdleTimeout(
     () =>
@@ -746,6 +775,17 @@ function App() {
           handleLogout();
         }}
         />
+      </>
+    );
+  }
+
+  if (authRestoring) {
+    return (
+      <>
+        <SeoHead meta={getSeoMeta('app', locale)} locale={locale} />
+        <div className="flex min-h-dvh items-center justify-center bg-surface-50 text-sm text-surface-800/50">
+          {app.dashboard.loading}
+        </div>
       </>
     );
   }

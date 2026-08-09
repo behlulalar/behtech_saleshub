@@ -70,6 +70,13 @@ from lead_requests import (
     reject_lead_request,
     request_response,
 )
+from refresh_sessions import (
+    clear_refresh_cookie,
+    create_refresh_session,
+    revoke_all_refresh_sessions,
+    revoke_refresh_from_request,
+    rotate_refresh_session,
+)
 from migrate_auth import create_reset_token, create_verification_token, seed_user_defaults
 from dashboard import build_dashboard
 from funnel import build_sales_funnel
@@ -363,14 +370,49 @@ def lead_response(db: Session, user_id: int, lead: Lead, viewer: User | None = N
 
 @app.post("/api/auth/login", response_model=LoginResponse)
 @limiter.limit(settings.rate_limit_login)
-def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    data: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     user = authenticate_user(db, data.username.strip().lower(), data.password)
     if not user:
         raise HTTPException(status_code=401, detail=GENERIC_LOGIN_MSG)
     require_verified_user(user)
 
     token, expires_in = create_access_token(
-        user.id, user.username, data.remember_me, user.token_version or 0
+        user.id, user.username, user.token_version or 0
+    )
+    if data.remember_me:
+        create_refresh_session(db, user.id, response)
+    else:
+        clear_refresh_cookie(response)
+
+    return LoginResponse(
+        access_token=token,
+        username=user.username,
+        role=user.role or ROLE_OWNER,
+        account_type=user.account_type or "company",
+        expires_in=expires_in,
+        idle_timeout_minutes=settings.idle_timeout_minutes,
+    )
+
+
+@app.post("/api/auth/refresh", response_model=LoginResponse)
+@limiter.limit(settings.rate_limit_login)
+def refresh_auth_session(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    user = rotate_refresh_session(db, request, response)
+    if not user:
+        raise HTTPException(status_code=401, detail=GENERIC_LOGIN_MSG)
+    require_verified_user(user)
+
+    token, expires_in = create_access_token(
+        user.id, user.username, user.token_version or 0
     )
     return LoginResponse(
         access_token=token,
@@ -380,6 +422,17 @@ def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
         expires_in=expires_in,
         idle_timeout_minutes=settings.idle_timeout_minutes,
     )
+
+
+@app.post("/api/auth/logout", response_model=MessageResponse)
+def logout_auth_session(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    revoke_refresh_from_request(db, request)
+    clear_refresh_cookie(response)
+    return MessageResponse(message="Çıkış yapıldı.")
 
 
 @app.post("/api/auth/register", response_model=RegisterResponse, status_code=201)
@@ -431,7 +484,7 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
         )
 
     token, expires_in = create_access_token(
-        user.id, user.username, remember_me=False, token_version=user.token_version or 0
+        user.id, user.username, token_version=user.token_version or 0
     )
     return RegisterResponse(
         message="Hesabınız oluşturuldu.",
@@ -545,6 +598,7 @@ def reset_password(request: Request, data: ResetPasswordRequest, db: Session = D
 
     user.password_hash = hash_password(data.password)
     bump_token_version(user)
+    revoke_all_refresh_sessions(db, user.id)
     reset_record.used_at = datetime.utcnow()
     db.commit()
 
@@ -624,6 +678,7 @@ def update_me(
             raise HTTPException(status_code=400, detail=password_errors[0])
         user.password_hash = hash_password(data.new_password)
         bump_token_version(user)
+        revoke_all_refresh_sessions(db, user.id)
 
     db.commit()
     db.refresh(user)

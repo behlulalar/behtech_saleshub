@@ -15,20 +15,14 @@ security = HTTPBearer()
 def create_access_token(
     user_id: int,
     username: str,
-    remember_me: bool = False,
     token_version: int = 0,
 ) -> tuple[str, int]:
-    if remember_me:
-        expire_delta = timedelta(days=settings.remember_me_expire_days)
-    else:
-        expire_delta = timedelta(minutes=settings.access_token_expire_minutes)
-
+    expire_delta = timedelta(minutes=settings.access_token_expire_minutes)
     expire = datetime.utcnow() + expire_delta
     payload = {
         "exp": expire,
         "sub": str(user_id),
         "username": username,
-        "remember": remember_me,
         "tv": token_version,
     }
     token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)

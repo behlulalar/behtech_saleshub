@@ -1,8 +1,5 @@
 const TOKEN_KEY = 'crm_token';
-const REMEMBER_KEY = 'crm_remember';
 const REMEMBER_PREF_KEY = 'crm_remember_pref';
-const USERNAME_KEY = 'crm_username';
-const PASSWORD_KEY = 'crm_password';
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 let idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
@@ -11,18 +8,16 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 }
 
+/** User opted into remember-me (persistent session via HttpOnly cookie). */
 export function isRememberMe(): boolean {
-  if (localStorage.getItem(REMEMBER_KEY) === '1') return true;
-  // Kalıcı token varsa oturum "beni hatırla" ile açılmış kabul edilir (bayrak senkronu).
-  return !!localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(REMEMBER_PREF_KEY) === '1';
 }
 
-/** Login form checkbox — survives logout / expired session when user opted in before. */
 export function getRememberPreference(): boolean {
   const pref = localStorage.getItem(REMEMBER_PREF_KEY);
   if (pref === '1') return true;
   if (pref === '0') return false;
-  return isRememberMe();
+  return false;
 }
 
 export function setRememberPreference(remember: boolean) {
@@ -34,10 +29,8 @@ export function setToken(token: string, remember: boolean) {
   sessionStorage.removeItem(TOKEN_KEY);
   if (remember) {
     localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(REMEMBER_KEY, '1');
   } else {
     sessionStorage.setItem(TOKEN_KEY, token);
-    localStorage.removeItem(REMEMBER_KEY);
   }
 }
 
@@ -46,53 +39,18 @@ export function clearToken() {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
-/** Oturum bitti (401 / süre doldu) — “beni hatırla” kullanıcı adını korur. */
+/** Oturum bitti (401 / süre doldu) — remember preference korunur. */
 export function clearSessionExpired() {
   clearToken();
 }
 
 export function clearAuth() {
   clearToken();
-  localStorage.removeItem(REMEMBER_KEY);
   localStorage.removeItem(REMEMBER_PREF_KEY);
-  clearRememberCredentials();
-}
-
-export function setSavedPassword(password: string) {
-  localStorage.setItem(PASSWORD_KEY, password);
-}
-
-export function clearSavedPassword() {
-  localStorage.removeItem(PASSWORD_KEY);
-}
-
-export function getSavedPassword(): string | null {
-  if (!getRememberPreference()) return null;
-  return localStorage.getItem(PASSWORD_KEY);
-}
-
-export function persistRememberCredentials(username: string, password: string) {
-  setRememberPreference(true);
-  if (username.trim()) setUsername(username.trim());
-  if (password) setSavedPassword(password);
-}
-
-export function clearRememberCredentials() {
-  clearSavedUsername();
-  clearSavedPassword();
-}
-
-export function setUsername(username: string) {
-  localStorage.setItem(USERNAME_KEY, username);
-}
-
-export function clearSavedUsername() {
-  localStorage.removeItem(USERNAME_KEY);
 }
 
 export function getUsername(): string | null {
-  if (!getRememberPreference()) return null;
-  return localStorage.getItem(USERNAME_KEY);
+  return null;
 }
 
 export function isAuthenticated(): boolean {

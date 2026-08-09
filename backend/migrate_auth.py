@@ -106,6 +106,14 @@ def run_migrations(db: Session) -> None:
 
         EmailVerificationToken.__table__.create(db.bind)
         db.commit()
+        inspector = inspect(db.bind)
+        tables = inspector.get_table_names()
+
+    if "refresh_sessions" not in tables:
+        from database import RefreshSession
+
+        RefreshSession.__table__.create(db.bind)
+        db.commit()
 
     grandfather_legacy_users(db)
 

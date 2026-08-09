@@ -1,9 +1,44 @@
 import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
-import { clearSessionExpired, getToken, setToken, clearRememberCredentials, setIdleTimeoutMinutes, setRememberPreference, persistRememberCredentials } from './auth';
+import { clearSessionExpired, getToken, setIdleTimeoutMinutes, setRememberPreference, setToken } from './auth';
 
 const API_BASE = '/api';
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let refreshPromise: Promise<boolean> | null = null;
+
+async function fetchWithCredentials(path: string, options: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    },
+  });
+}
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetchWithCredentials('/auth/refresh', { method: 'POST' });
+      if (!res.ok) return false;
+      const data = (await res.json()) as AuthResponse;
+      setRememberPreference(true);
+      setToken(data.access_token, true);
+      if (data.idle_timeout_minutes) {
+        setIdleTimeoutMinutes(data.idle_timeout_minutes);
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -14,7 +49,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
+
+  if (
+    res.status === 401
+    && !retried
+    && path !== '/auth/login'
+    && path !== '/auth/refresh'
+  ) {
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed) {
+      return request<T>(path, options, true);
+    }
+    clearSessionExpired();
+    window.location.reload();
+    throw new Error('Oturum süresi doldu');
+  }
 
   if (res.status === 401 && path !== '/auth/login') {
     clearSessionExpired();
@@ -44,7 +94,7 @@ export class ApiHttpError extends Error {
   }
 }
 
-async function requestWithStatus<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function requestWithStatus<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -55,7 +105,22 @@ async function requestWithStatus<T>(path: string, options: RequestInit = {}): Pr
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
+
+  if (
+    res.status === 401
+    && !retried
+    && path !== '/auth/login'
+    && path !== '/auth/refresh'
+  ) {
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed) {
+      return requestWithStatus<T>(path, options, true);
+    }
+    clearSessionExpired();
+    window.location.reload();
+    throw new ApiHttpError(401, 'Oturum süresi doldu');
+  }
 
   if (res.status === 401 && path !== '/auth/login') {
     clearSessionExpired();
@@ -102,10 +167,36 @@ export interface RegisterResponse {
 export const api = {
   getPublicConfig: () => request<PublicConfig>('/public/config'),
 
-  login: (username: string, password: string, remember_me: boolean) =>
-    request<AuthResponse>('/auth/login', {
+  login: async (username: string, password: string, remember_me: boolean) => {
+    const res = await fetchWithCredentials('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password, remember_me }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Bir hata oluştu' }));
+      const detail = err.detail;
+      const message =
+        typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : 'Bir hata oluştu';
+      throw new Error(message || 'Bir hata oluştu');
+    }
+    return res.json() as Promise<AuthResponse>;
+  },
+
+  refreshSession: () =>
+    fetchWithCredentials('/auth/refresh', { method: 'POST' }).then(async (res) => {
+      if (!res.ok) {
+        throw new Error('Oturum restore edilemedi');
+      }
+      return res.json() as Promise<AuthResponse>;
+    }),
+
+  logout: () =>
+    fetchWithCredentials('/auth/logout', { method: 'POST' }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Bir hata oluştu' }));
+        throw new Error(typeof err.detail === 'string' ? err.detail : 'Çıkış başarısız');
+      }
+      return res.json() as Promise<{ message: string }>;
     }),
 
   register: (
@@ -701,15 +792,10 @@ export const api = {
   },
 };
 
-export function saveAuth(response: AuthResponse, remember: boolean, password?: string) {
+export function saveAuth(response: AuthResponse, remember: boolean) {
   setRememberPreference(remember);
   setToken(response.access_token, remember);
   if (response.idle_timeout_minutes) {
     setIdleTimeoutMinutes(response.idle_timeout_minutes);
-  }
-  if (remember) {
-    persistRememberCredentials(response.username, password || '');
-  } else {
-    clearRememberCredentials();
   }
 }

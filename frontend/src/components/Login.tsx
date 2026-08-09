@@ -11,16 +11,7 @@ import {
   User,
 } from 'lucide-react';
 import { api, saveAuth } from '../api';
-import {
-  getUsername,
-  getSavedPassword,
-  getRememberPreference,
-  setRememberPreference,
-  persistRememberCredentials,
-  clearRememberCredentials,
-  setUsername as persistUsername,
-  setSavedPassword,
-} from '../auth';
+import { getRememberPreference, setRememberPreference } from '../auth';
 import { authCopy } from '../i18n/auth';
 import { useLocale } from '../i18n/locale';
 import AuthShell, { type AuthBenefit } from './AuthShell';
@@ -50,8 +41,8 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 export default function Login({ onLogin, initialView = 'login', onViewChange, onHome }: Props) {
   const [view, setView] = useState<AuthView>(initialView);
   const { locale } = useLocale();
-  const [username, setUsername] = useState(() => getUsername() || '');
-  const [password, setPassword] = useState(() => (getRememberPreference() ? getSavedPassword() || '' : ''));
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(() => getRememberPreference());
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -61,17 +52,11 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
   const t = authCopy[locale];
 
   useEffect(() => {
+    setRememberMe(getRememberPreference());
+  }, []);
+  useEffect(() => {
     setView(initialView);
   }, [initialView]);
-
-  useEffect(() => {
-    if (!getRememberPreference()) return;
-    setRememberMe(true);
-    const savedUser = getUsername();
-    const savedPass = getSavedPassword();
-    if (savedUser) setUsername(savedUser);
-    if (savedPass) setPassword(savedPass);
-  }, []);
 
   const switchView = (v: AuthView) => {
     setTransitionDir(v === 'login' ? 'back' : 'forward');
@@ -92,12 +77,6 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
   const handleRememberChange = (checked: boolean) => {
     setRememberMe(checked);
     setRememberPreference(checked);
-    if (checked) {
-      persistRememberCredentials(username, password);
-    } else {
-      clearRememberCredentials();
-      setPassword('');
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,7 +86,7 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
 
     try {
       const res = await api.login(username.trim(), password, rememberMe);
-      saveAuth(res, rememberMe, password);
+      saveAuth(res, rememberMe);
       onLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.login.loginFailed);
@@ -159,11 +138,7 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
                 id="login-username"
                 className="input-field pl-9"
                 value={username}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setUsername(next);
-                  if (rememberMe && next.trim()) persistUsername(next.trim());
-                }}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder={t.login.usernamePlaceholder}
                 autoComplete="username"
                 autoFocus
@@ -183,11 +158,7 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
                 type={showPassword ? 'text' : 'password'}
                 className="input-field pl-9 pr-10"
                 value={password}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setPassword(next);
-                  if (rememberMe && next) setSavedPassword(next);
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder={t.login.passwordPlaceholder}
                 autoComplete="current-password"
                 required
