@@ -1,5 +1,5 @@
 import type { ActionProposalItem, Activity, ActivityFormData, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
-import { clearSessionExpired, getToken, setToken, setUsername, clearRememberCredentials, setSavedPassword, setIdleTimeoutMinutes, setRememberPreference } from './auth';
+import { clearSessionExpired, getToken, setToken, clearRememberCredentials, setIdleTimeoutMinutes, setRememberPreference, persistRememberCredentials } from './auth';
 
 const API_BASE = '/api';
 
@@ -639,8 +639,7 @@ export function saveAuth(response: AuthResponse, remember: boolean, password?: s
     setIdleTimeoutMinutes(response.idle_timeout_minutes);
   }
   if (remember) {
-    setUsername(response.username);
-    if (password) setSavedPassword(password);
+    persistRememberCredentials(response.username, password || '');
   } else {
     clearRememberCredentials();
   }

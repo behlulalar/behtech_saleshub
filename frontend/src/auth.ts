@@ -12,7 +12,9 @@ export function getToken(): string | null {
 }
 
 export function isRememberMe(): boolean {
-  return localStorage.getItem(REMEMBER_KEY) === '1';
+  if (localStorage.getItem(REMEMBER_KEY) === '1') return true;
+  // Kalıcı token varsa oturum "beni hatırla" ile açılmış kabul edilir (bayrak senkronu).
+  return !!localStorage.getItem(TOKEN_KEY);
 }
 
 /** Login form checkbox — survives logout / expired session when user opted in before. */
@@ -53,8 +55,7 @@ export function clearAuth() {
   clearToken();
   localStorage.removeItem(REMEMBER_KEY);
   localStorage.removeItem(REMEMBER_PREF_KEY);
-  clearSavedUsername();
-  clearSavedPassword();
+  clearRememberCredentials();
 }
 
 export function setSavedPassword(password: string) {
@@ -90,6 +91,7 @@ export function clearSavedUsername() {
 }
 
 export function getUsername(): string | null {
+  if (!getRememberPreference()) return null;
   return localStorage.getItem(USERNAME_KEY);
 }
 

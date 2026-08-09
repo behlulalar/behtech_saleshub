@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { clearAuth, getIdleTimeoutMs } from '../auth';
+import { clearSessionExpired, getIdleTimeoutMs } from '../auth';
 
 export function useIdleTimeout(onTimeout: () => void, enabled: boolean) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -15,7 +15,7 @@ export function useIdleTimeout(onTimeout: () => void, enabled: boolean) {
     const reset = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        clearAuth();
+        clearSessionExpired();
         onTimeoutRef.current();
       }, getIdleTimeoutMs());
     };

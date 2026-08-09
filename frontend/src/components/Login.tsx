@@ -64,6 +64,15 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
     setView(initialView);
   }, [initialView]);
 
+  useEffect(() => {
+    if (!getRememberPreference()) return;
+    setRememberMe(true);
+    const savedUser = getUsername();
+    const savedPass = getSavedPassword();
+    if (savedUser) setUsername(savedUser);
+    if (savedPass) setPassword(savedPass);
+  }, []);
+
   const switchView = (v: AuthView) => {
     setTransitionDir(v === 'login' ? 'back' : 'forward');
     setView(v);
@@ -194,26 +203,23 @@ export default function Login({ onLogin, initialView = 'login', onViewChange, on
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-surface-800/70">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => handleRememberChange(e.target.checked)}
-                  className="h-4 w-4 rounded border-surface-200 text-brand-500 focus:ring-brand-500"
-                />
-                {t.login.rememberMe}
-              </label>
-              <button
-                type="button"
-                onClick={() => switchView('forgot')}
-                className="text-sm font-medium text-brand-500 transition hover:text-brand-600"
-              >
-                {t.login.forgotPassword}
-              </button>
-            </div>
-            <p className="text-xs text-surface-800/45">{t.login.rememberMeHint}</p>
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-surface-800/70">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => handleRememberChange(e.target.checked)}
+                className="h-4 w-4 rounded border-surface-200 text-brand-500 focus:ring-brand-500"
+              />
+              {t.login.rememberMe}
+            </label>
+            <button
+              type="button"
+              onClick={() => switchView('forgot')}
+              className="text-sm font-medium text-brand-500 transition hover:text-brand-600"
+            >
+              {t.login.forgotPassword}
+            </button>
           </div>
 
           {error ? (
