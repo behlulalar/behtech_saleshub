@@ -16,6 +16,7 @@ dist/
 .idea/
 .vscode/
 .cursor/
+.qa/
 .DS_Store
 
 # Uploaded customer files (stored on server, never in git)

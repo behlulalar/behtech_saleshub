@@ -24,6 +24,7 @@ rsync -avz --delete \
   --exclude 'frontend/node_modules' \
   --exclude 'node_modules' \
   --exclude '.cursor' \
+  --exclude '.qa' \
   --exclude '*.db' \
   "$LOCAL_DIR/" "$SERVER:$REMOTE_DIR/"
 
