@@ -163,6 +163,13 @@ def test_registry_closed():
         )
 
 
+def test_status_change_executor_is_real():
+    ex = get("propose_status_change").executor
+    from ai.actions.executors import StatusChangeExecutor
+
+    assert isinstance(ex, StatusChangeExecutor)
+
+
 def test_follow_up_executor_is_real():
     ex = get("propose_follow_up_task").executor
     from ai.actions.executors import FollowUpTaskExecutor

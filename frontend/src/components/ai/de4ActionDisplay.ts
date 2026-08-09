@@ -15,6 +15,8 @@ export function actionTypeLabel(
       return labels.de4ActionTypeNoteAppend ?? formatActionType(actionType);
     case 'propose_follow_up_task':
       return labels.de4ActionTypeFollowUp ?? formatActionType(actionType);
+    case 'propose_status_change':
+      return labels.de4ActionTypeStatusChange ?? formatActionType(actionType);
     default:
       return formatActionType(actionType);
   }

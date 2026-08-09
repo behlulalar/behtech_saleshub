@@ -9,9 +9,15 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from activities import ACTIVITY_TYPES, log_activity
-from ai.actions.schemas import ProposeFollowUpTaskParams, ProposeLogActivityParams, ProposeNoteAppendParams
+from ai.actions.schemas import (
+    ProposeFollowUpTaskParams,
+    ProposeLogActivityParams,
+    ProposeNoteAppendParams,
+    ProposeStatusChangeParams,
+)
 from app_timezone import local_today
 from database import Lead
+from intelligence.business_events import emit_stage_change_if_needed
 from intelligence.proposal_effects import _first_free_takip_slot
 
 
@@ -154,6 +160,72 @@ class FollowUpTaskExecutor(ActionExecutor):
                 "takip_field": None,
                 "scheduled_date": None,
                 "task_scheduled": False,
+                "action_type": self.action_type,
+            },
+        )
+
+
+class StatusChangeExecutor(ActionExecutor):
+    """Stage 4.11 — update Lead.durum (aligned with PUT /api/leads activity pattern)."""
+
+    def execute(
+        self,
+        *,
+        db: Session,
+        organization_id: int,
+        actor_user_id: int,
+        params: BaseModel,
+        **_: Any,
+    ) -> ExecuteResult:
+        _ = actor_user_id
+        if not isinstance(params, ProposeStatusChangeParams):
+            raise TypeError("invalid_params_type")
+        lead = (
+            db.query(Lead)
+            .filter(Lead.id == params.lead_id, Lead.user_id == organization_id)
+            .first()
+        )
+        if not lead:
+            raise ValueError("lead_not_found")
+
+        previous = (lead.durum or "").strip() or "Yeni"
+        target = params.target_status
+        if previous == target:
+            return ExecuteResult(
+                success=True,
+                message="status_unchanged",
+                dry_run=False,
+                activity_id=None,
+                result_payload={
+                    "lead_id": lead.id,
+                    "previous_status": previous,
+                    "new_status": target,
+                    "status_changed": False,
+                    "action_type": self.action_type,
+                },
+            )
+
+        lead.durum = target
+        emit_stage_change_if_needed(db, organization_id, lead.id, previous, target)
+        activity = log_activity(
+            db,
+            user_id=organization_id,
+            lead_id=lead.id,
+            activity_type="durum_degisti",
+            title="Durum değişti",
+            description=f"{previous} → {target}",
+        )
+        db.flush()
+        return ExecuteResult(
+            success=True,
+            message="status_changed",
+            dry_run=False,
+            activity_id=activity.id,
+            result_payload={
+                "lead_id": lead.id,
+                "previous_status": previous,
+                "new_status": target,
+                "status_changed": True,
                 "action_type": self.action_type,
             },
         )
