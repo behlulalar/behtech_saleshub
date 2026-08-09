@@ -3,6 +3,7 @@ import { Bot, Loader2 } from 'lucide-react';
 import { api } from '../../api';
 import { useLocale } from '../../i18n/locale';
 import type { AiActionItem, AiStatusResponse } from '../../types';
+import { actionTypeLabel, formatActionType, statusBadgeClass, statusLabel } from './de4ActionDisplay';
 
 interface Props {
   isOwner: boolean;
@@ -19,49 +20,6 @@ const ACTIVE_STATUSES = new Set([
   'cancelled',
   'expired',
 ]);
-
-function formatActionType(actionType: string): string {
-  return actionType.replace(/_/g, ' ');
-}
-
-function statusLabel(status: string, t: Record<string, string>): string {
-  switch (status) {
-    case 'proposed':
-      return t.de4ActionsStatusProposed;
-    case 'approved':
-      return t.de4ActionsStatusApproved;
-    case 'executing':
-      return t.de4ActionsExecuting;
-    case 'executed':
-      return t.de4ActionsExecuted;
-    case 'failed':
-      return t.de4ActionsFailed;
-    case 'cancelled':
-      return t.de4ActionsCancelled;
-    case 'expired':
-      return t.de4ActionsExpired;
-    default:
-      return status;
-  }
-}
-
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case 'approved':
-      return 'bg-emerald-100 text-emerald-900';
-    case 'executing':
-      return 'bg-amber-100 text-amber-900';
-    case 'executed':
-      return 'bg-surface-100 text-surface-800';
-    case 'failed':
-      return 'bg-rose-100 text-rose-900';
-    case 'cancelled':
-    case 'expired':
-      return 'bg-surface-100 text-surface-600';
-    default:
-      return 'bg-violet-100 text-violet-900';
-  }
-}
 
 export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 0 }: Props) {
   const { app } = useLocale();
@@ -189,7 +147,7 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium uppercase tracking-wide text-violet-700/80">
-                    {formatActionType(item.action_type)}
+                    {actionTypeLabel(item.action_type, t as unknown as Record<string, string>)}
                   </p>
                   <button
                     type="button"

@@ -299,6 +299,13 @@ export interface AppCopy {
     diagnosisInterpretWhy: string;
     diagnosisInterpretFindings: string;
     diagnosisInterpretActions: string;
+    diagnosisInterpretBridgeTitle: string;
+    diagnosisInterpretBridgeHint: string;
+    diagnosisInterpretBridgeLoading: string;
+    diagnosisInterpretBridgeReason: string;
+    de4ActionTypeLogActivity: string;
+    de4ActionTypeNoteAppend: string;
+    de4ActionTypeFollowUp: string;
     diagnosisInterpretConfidence: string;
     diagnosisInterpretHide: string;
     diagnosisInterpretDisabledTitle: string;
@@ -853,6 +860,14 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       diagnosisInterpretWhy: 'Neden önemli?',
       diagnosisInterpretFindings: 'Öne çıkan bulgular',
       diagnosisInterpretActions: 'Önerilen aksiyonlar',
+      diagnosisInterpretBridgeTitle: 'Önerilen aksiyon (DE-4)',
+      diagnosisInterpretBridgeHint:
+        'Onay sonrası «Uygula» ile CRM\'e yazılır. AI otomatik işlem yapmaz.',
+      diagnosisInterpretBridgeLoading: 'Aksiyonlar yükleniyor…',
+      diagnosisInterpretBridgeReason: 'Neden',
+      de4ActionTypeLogActivity: 'Takip aktivitesi oluştur',
+      de4ActionTypeNoteAppend: 'Lead notuna ekle',
+      de4ActionTypeFollowUp: 'Takip görevi öner',
       diagnosisInterpretConfidence: 'Güven seviyesi',
       diagnosisInterpretHide: 'Yorumu gizle',
       diagnosisInterpretDisabledTitle: 'AI yorumu şu anda kullanılamıyor',
@@ -1423,6 +1438,14 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       diagnosisInterpretWhy: 'Why it matters',
       diagnosisInterpretFindings: 'Key findings',
       diagnosisInterpretActions: 'Recommended actions',
+      diagnosisInterpretBridgeTitle: 'Suggested action (DE-4)',
+      diagnosisInterpretBridgeHint:
+        'After approval, use Execute to write to CRM. AI does not mutate CRM automatically.',
+      diagnosisInterpretBridgeLoading: 'Loading actions…',
+      diagnosisInterpretBridgeReason: 'Reason',
+      de4ActionTypeLogActivity: 'Create follow-up activity',
+      de4ActionTypeNoteAppend: 'Append lead note',
+      de4ActionTypeFollowUp: 'Suggest follow-up task',
       diagnosisInterpretConfidence: 'Confidence',
       diagnosisInterpretHide: 'Hide insight',
       diagnosisInterpretDisabledTitle: 'AI insight is not available right now',

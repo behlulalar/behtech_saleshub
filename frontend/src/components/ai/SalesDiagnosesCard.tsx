@@ -3,6 +3,7 @@ import { Activity, ChevronRight, Loader2, Sparkles, Stethoscope } from 'lucide-r
 import { ApiHttpError, api } from '../../api';
 import { useLocale } from '../../i18n/locale';
 import type { DiagnosisItem, DiagnosisInterpretResponse, DiagnosisPriorityLead } from '../../types';
+import DiagnosisBridgeActionsPanel from './DiagnosisBridgeActionsPanel';
 import { aiPriorityBadgeClass, aiPriorityLabel } from './aiPriorityUi';
 import {
   type InterpretAvailability,
@@ -29,6 +30,7 @@ const priorityClass: Record<string, string> = {
 
 type Props = {
   onEditLead?: (leadId: number) => void;
+  onDe4ActionChanged?: () => void;
 };
 
 function PriorityLeadRow({
@@ -76,16 +78,21 @@ function InterpretationBody({
   response,
   labels,
   priorityLabels,
+  onOpenLead,
+  onDe4ActionChanged,
 }: {
   response: DiagnosisInterpretResponse;
   labels: (typeof import('../../i18n/app').appCopy)['tr']['ai'];
   priorityLabels: Record<string, string>;
+  onOpenLead?: (leadId: number) => void;
+  onDe4ActionChanged?: () => void;
 }) {
   const interp = response.interpretation;
   if (!interp || !hasRenderableInterpretation(response)) return null;
 
   const findings = (interp.key_findings ?? []).filter((line) => line?.trim());
   const actions = interp.recommended_actions ?? [];
+  const bridgeActionIds = response.proposal_bridge?.action_ids?.filter(Boolean) ?? [];
 
   return (
     <div className="space-y-3 text-sm text-surface-800">
@@ -143,6 +150,11 @@ function InterpretationBody({
           </ol>
         </div>
       ) : null}
+      <DiagnosisBridgeActionsPanel
+        actionIds={bridgeActionIds}
+        onOpenLead={onOpenLead}
+        onLifecycleChange={onDe4ActionChanged}
+      />
       <p className="text-xs text-surface-600">
         <span className="font-medium text-surface-700">{labels.diagnosisInterpretConfidence}: </span>
         {aiPriorityLabel(interp.confidence, priorityLabels)}
@@ -162,6 +174,8 @@ function DiagnosisInterpretSection({
   onToggleExpand,
   labels,
   priorityLabels,
+  onOpenLead,
+  onDe4ActionChanged,
 }: {
   diagnosisId: string;
   availability: InterpretAvailability;
@@ -170,6 +184,8 @@ function DiagnosisInterpretSection({
   onToggleExpand: (diagnosisId: string) => void;
   labels: (typeof import('../../i18n/app').appCopy)['tr']['ai'];
   priorityLabels: Record<string, string>;
+  onOpenLead?: (leadId: number) => void;
+  onDe4ActionChanged?: () => void;
 }) {
   const errorMessage =
     state.phase === 'error'
@@ -259,6 +275,8 @@ function DiagnosisInterpretSection({
                 response={state.response}
                 labels={labels}
                 priorityLabels={priorityLabels}
+                onOpenLead={onOpenLead}
+                onDe4ActionChanged={onDe4ActionChanged}
               />
               <button
                 type="button"
@@ -281,7 +299,7 @@ function DiagnosisInterpretSection({
   );
 }
 
-export default function SalesDiagnosesCard({ onEditLead }: Props) {
+export default function SalesDiagnosesCard({ onEditLead, onDe4ActionChanged }: Props) {
   const { app, locale } = useLocale();
   const t = app.ai;
   const cardCopy = app.salesDiagnoses;
@@ -487,6 +505,8 @@ export default function SalesDiagnosesCard({ onEditLead }: Props) {
                 onToggleExpand={toggleExpand}
                 labels={t}
                 priorityLabels={priorityLabels}
+                onOpenLead={onEditLead}
+                onDe4ActionChanged={onDe4ActionChanged}
               />
             </li>
           ))}

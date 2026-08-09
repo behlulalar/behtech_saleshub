@@ -163,7 +163,10 @@ export default function Dashboard({
       </div>
 
       <CompanyIntelligenceCard isOwner={isOwner} />
-      <SalesDiagnosesCard onEditLead={onEditLead} />
+      <SalesDiagnosesCard
+        onEditLead={onEditLead}
+        onDe4ActionChanged={() => setProposalRefresh((n) => n + 1)}
+      />
 
       <AiPriorityList
         isOwner={isOwner}

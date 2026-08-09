@@ -439,6 +439,27 @@ export interface DiagnosisInterpretRequest {
   refresh?: boolean;
 }
 
+export interface ProposalBridgeItemResult {
+  recommendation_index: number;
+  outcome: string;
+  action_type?: string | null;
+  action_id?: string | null;
+  created?: boolean;
+  skip_reason?: string | null;
+}
+
+export interface ProposalBridgeSummary {
+  recommendation_count?: number;
+  mapped_count?: number;
+  no_action_count?: number;
+  proposed_count?: number;
+  skipped_count?: number;
+  created_count?: number;
+  action_ids?: string[];
+  items?: ProposalBridgeItemResult[];
+  bridge_error?: boolean;
+}
+
 export interface DiagnosisInterpretResponse {
   diagnosis_id: string;
   interpretation: DiagnosisInterpretation | null;
@@ -447,6 +468,7 @@ export interface DiagnosisInterpretResponse {
   context_fingerprint: string | null;
   disclaimer: string;
   error_code: string | null;
+  proposal_bridge?: ProposalBridgeSummary | null;
 }
 
 export interface SummarizeLeadRequest {
