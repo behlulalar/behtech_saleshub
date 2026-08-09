@@ -161,6 +161,7 @@ export interface AppCopy {
     nextPage: string;
     importExcel: string;
     filters: string;
+    searchAndFilters: string;
   };
   dashboard: {
     loading: string;
@@ -715,6 +716,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       nextPage: 'Sonraki',
       importExcel: 'Excel',
       filters: 'Filtreler',
+      searchAndFilters: 'Ara ve filtrele',
     },
     dashboard: {
       loading: 'Dashboard yükleniyor...',
@@ -1295,6 +1297,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       nextPage: 'Next',
       importExcel: 'Excel',
       filters: 'Filters',
+      searchAndFilters: 'Search & filters',
     },
     dashboard: {
       loading: 'Loading dashboard...',
