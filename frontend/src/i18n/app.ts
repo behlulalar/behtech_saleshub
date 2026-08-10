@@ -271,6 +271,8 @@ export interface AppCopy {
     de4ActionsSuggestedAt: string;
     de4ActionsExecuteSoon: string;
     de4ActionsApprove: string;
+    de4ActionsEdit: string;
+    de4ActionsCancelAction: string;
     de4ActionsExecute: string;
     de4ActionsExecuting: string;
     de4ActionsExecuted: string;
@@ -280,8 +282,24 @@ export interface AppCopy {
     de4ActionsStatusApproved: string;
     de4ActionsConfirmExecuteTitle: string;
     de4ActionsConfirmExecuteBody: string;
+    de4ActionsConfirmCancelTitle: string;
+    de4ActionsConfirmCancelBody: string;
     de4ActionsConfirmCancel: string;
     de4ActionsConfirmOk: string;
+    de4ActionsConfirmCancelOk: string;
+    de4ActionsEditTitle: string;
+    de4ActionsSave: string;
+    de4ActionsFieldNote: string;
+    de4ActionsFieldPriority: string;
+    de4ActionsFieldStatus: string;
+    de4ActionsFieldNoteText: string;
+    de4ActionsFieldSeparator: string;
+    de4ActionsFieldActivityType: string;
+    de4ActionsFieldTitle: string;
+    de4ActionsFieldDescription: string;
+    de4ActionsGroupCount: string;
+    de4ActionsGroupExpand: string;
+    de4ActionsGroupCollapse: string;
     de4ActionsErrorGeneric: string;
     runHistoryTitle: string;
     runHistoryEmpty: string;
@@ -858,6 +876,8 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsSuggestedAt: 'Önerildiği tarih',
       de4ActionsExecuteSoon: 'Bu tür henüz uygulanamaz',
       de4ActionsApprove: 'Onayla',
+      de4ActionsEdit: 'Düzenle',
+      de4ActionsCancelAction: 'İptal',
       de4ActionsExecute: 'Uygula',
       de4ActionsExecuting: 'Uygulanıyor…',
       de4ActionsExecuted: 'Uygulandı',
@@ -868,8 +888,24 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsConfirmExecuteTitle: 'Aksiyonu uygula',
       de4ActionsConfirmExecuteBody:
         'Bu aksiyon lead kaydında onayladığınız değişikliği uygular. Devam etmek istediğinize emin misiniz?',
+      de4ActionsConfirmCancelTitle: 'Aksiyonu iptal et',
+      de4ActionsConfirmCancelBody: 'Bu aksiyonu iptal etmek istediğinize emin misiniz?',
       de4ActionsConfirmCancel: 'Vazgeç',
       de4ActionsConfirmOk: 'Evet, uygula',
+      de4ActionsConfirmCancelOk: 'Evet, iptal et',
+      de4ActionsEditTitle: 'Aksiyonu düzenle',
+      de4ActionsSave: 'Kaydet',
+      de4ActionsFieldNote: 'Not',
+      de4ActionsFieldPriority: 'Öncelik',
+      de4ActionsFieldStatus: 'Durum',
+      de4ActionsFieldNoteText: 'Not metni',
+      de4ActionsFieldSeparator: 'Ayırıcı',
+      de4ActionsFieldActivityType: 'Aktivite türü',
+      de4ActionsFieldTitle: 'Başlık',
+      de4ActionsFieldDescription: 'Açıklama',
+      de4ActionsGroupCount: '{count} öneri',
+      de4ActionsGroupExpand: 'İncele',
+      de4ActionsGroupCollapse: 'Gizle',
       de4ActionsErrorGeneric: 'İşlem tamamlanamadı. Lütfen tekrar deneyin.',
       runHistoryTitle: 'Son AI işleri',
       runHistoryEmpty: 'Henüz kayıtlı run yok.',
@@ -1464,6 +1500,8 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsSuggestedAt: 'Suggested at',
       de4ActionsExecuteSoon: 'This type cannot be executed yet',
       de4ActionsApprove: 'Approve',
+      de4ActionsEdit: 'Edit',
+      de4ActionsCancelAction: 'Cancel',
       de4ActionsExecute: 'Execute',
       de4ActionsExecuting: 'Executing…',
       de4ActionsExecuted: 'Executed',
@@ -1474,8 +1512,24 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsConfirmExecuteTitle: 'Execute action',
       de4ActionsConfirmExecuteBody:
         'This will apply the approved change on the lead record. Are you sure you want to continue?',
-      de4ActionsConfirmCancel: 'Cancel',
+      de4ActionsConfirmCancelTitle: 'Cancel action',
+      de4ActionsConfirmCancelBody: 'Are you sure you want to cancel this action?',
+      de4ActionsConfirmCancel: 'Dismiss',
       de4ActionsConfirmOk: 'Yes, execute',
+      de4ActionsConfirmCancelOk: 'Yes, cancel it',
+      de4ActionsEditTitle: 'Edit action',
+      de4ActionsSave: 'Save',
+      de4ActionsFieldNote: 'Note',
+      de4ActionsFieldPriority: 'Priority',
+      de4ActionsFieldStatus: 'Status',
+      de4ActionsFieldNoteText: 'Note text',
+      de4ActionsFieldSeparator: 'Separator',
+      de4ActionsFieldActivityType: 'Activity type',
+      de4ActionsFieldTitle: 'Title',
+      de4ActionsFieldDescription: 'Description',
+      de4ActionsGroupCount: '{count} proposals',
+      de4ActionsGroupExpand: 'Review',
+      de4ActionsGroupCollapse: 'Hide',
       de4ActionsErrorGeneric: 'Could not complete the action. Please try again.',
       runHistoryTitle: 'Recent AI runs',
       runHistoryEmpty: 'No runs yet.',

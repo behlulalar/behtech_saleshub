@@ -946,6 +946,14 @@ class AiActionFromRecommendationRequest(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=128)
 
 
+class AiActionUpdateRequest(BaseModel):
+    """Proposed-only parameter edit (identity / provenance fields immutable)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
 class AiActionItemResponse(BaseModel):
     action_id: str
     action_type: str

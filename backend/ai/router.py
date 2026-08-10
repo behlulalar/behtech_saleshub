@@ -32,6 +32,7 @@ from ai.actions.propose_service import (
     _lead_name,
 )
 from ai.actions.execute_service import ExecuteValidationError, approve_ai_action, execute_ai_action
+from ai.actions.management_service import cancel_ai_action, update_ai_action
 from ai.actions.mapper import MAPPER_NO_ACTION
 from ai.store import create_queued_run, get_run_for_org, list_runs_for_org, run_to_api_dict
 from ai.run_worker import execute_run, process_pending_runs
@@ -58,6 +59,7 @@ from schemas import (
     IntelligenceInsightItem,
     AiActionProposeRequest,
     AiActionFromRecommendationRequest,
+    AiActionUpdateRequest,
     AiActionItemResponse,
     AiActionExecuteResponse,
     AiActionListResponse,
@@ -321,13 +323,21 @@ def _execute_validation_to_http(exc: ExecuteValidationError) -> HTTPException:
         "invalid_transition",
         "invalid_status_for_approve",
         "invalid_status_for_execute",
+        "invalid_status_for_update",
+        "invalid_status_for_cancel",
+        "immutable_parameter",
+        "target_lead_mismatch",
+        "update_not_supported",
+        "target_not_in_org",
+        "invalid_target_entity",
+        "target_entity_id_required",
     ):
         status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     elif code in ("action_disabled", "action_not_allowed", "role_not_allowed", "execute_not_enabled"):
         status_code = status.HTTP_403_FORBIDDEN
     elif code == "not_found":
         status_code = status.HTTP_404_NOT_FOUND
-    elif code in ("action_in_progress",):
+    elif code in ("action_in_progress", "operational_duplicate_conflict"):
         status_code = status.HTTP_409_CONFLICT
     elif code in ("action_failed", "executor_failed"):
         status_code = status.HTTP_502_BAD_GATEWAY
@@ -348,6 +358,51 @@ def approve_ai_action_endpoint(
     role = getattr(_user, "role", None) or "owner"
     try:
         row = approve_ai_action(db, org_id=org_id, role=role, action_id=action_id)
+    except ExecuteValidationError as exc:
+        raise _execute_validation_to_http(exc) from exc
+    db.commit()
+    db.refresh(row)
+    return _action_item(db, org_id, row)
+
+
+@router.post("/actions/{action_id}/update", response_model=AiActionItemResponse)
+def update_ai_action_endpoint(
+    action_id: str,
+    body: AiActionUpdateRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, _user, org_id = ctx
+    _ = owner
+    role = getattr(_user, "role", None) or "owner"
+    try:
+        row = update_ai_action(
+            db,
+            org_id=org_id,
+            role=role,
+            action_id=action_id,
+            parameters=body.parameters,
+        )
+    except ExecuteValidationError as exc:
+        raise _execute_validation_to_http(exc) from exc
+    db.commit()
+    db.refresh(row)
+    return _action_item(db, org_id, row)
+
+
+@router.post("/actions/{action_id}/cancel", response_model=AiActionItemResponse)
+def cancel_ai_action_endpoint(
+    action_id: str,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+    owner: object = Depends(require_owner),
+):
+    require_ai_enabled()
+    db, _user, org_id = ctx
+    _ = owner
+    role = getattr(_user, "role", None) or "owner"
+    try:
+        row = cancel_ai_action(db, org_id=org_id, role=role, action_id=action_id)
     except ExecuteValidationError as exc:
         raise _execute_validation_to_http(exc) from exc
     db.commit()

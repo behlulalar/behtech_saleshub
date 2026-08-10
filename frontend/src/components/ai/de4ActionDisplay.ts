@@ -1,5 +1,17 @@
 /** Shared DE-4 action labels (backend `ai_actions` is source of truth). */
 
+const UPDATE_SUPPORTED = new Set([
+  'propose_follow_up_task',
+  'propose_priority_change',
+  'propose_status_change',
+  'propose_note_append',
+  'propose_log_activity',
+]);
+
+export function isDe4UpdateSupported(actionType: string): boolean {
+  return UPDATE_SUPPORTED.has(actionType);
+}
+
 export function formatActionType(actionType: string): string {
   return actionType.replace(/_/g, ' ');
 }

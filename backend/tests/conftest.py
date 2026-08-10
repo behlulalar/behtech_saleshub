@@ -13,7 +13,11 @@ _ACTIVE = ("proposed", "approved", "executing")
 def de4_clear_active_actions_before_test(request):
     """Prevent cross-test pollution for operational duplicate guards."""
     nodeid = request.node.nodeid
-    if "test_de4_actions" not in nodeid and "test_de4_duplicate" not in nodeid:
+    if (
+        "test_de4_actions" not in nodeid
+        and "test_de4_duplicate" not in nodeid
+        and "test_de4_action_management" not in nodeid
+    ):
         yield
         return
 

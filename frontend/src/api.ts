@@ -689,6 +689,15 @@ export const api = {
   approveAiAction: (actionId: string) =>
     request<AiActionItem>(`/ai/actions/${encodeURIComponent(actionId)}/approve`, { method: 'POST' }),
 
+  updateAiAction: (actionId: string, parameters: Record<string, unknown>) =>
+    request<AiActionItem>(`/ai/actions/${encodeURIComponent(actionId)}/update`, {
+      method: 'POST',
+      body: JSON.stringify({ parameters }),
+    }),
+
+  cancelAiAction: (actionId: string) =>
+    request<AiActionItem>(`/ai/actions/${encodeURIComponent(actionId)}/cancel`, { method: 'POST' }),
+
   executeAiAction: (actionId: string) =>
     request<AiActionExecuteResponse>(`/ai/actions/${encodeURIComponent(actionId)}/execute`, {
       method: 'POST',
