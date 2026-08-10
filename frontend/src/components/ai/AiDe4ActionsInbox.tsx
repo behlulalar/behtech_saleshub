@@ -12,7 +12,7 @@ import {
   statusLabel,
 } from './de4ActionDisplay';
 import { uniqueAiActionItems } from './de4ActionDedup';
-import { groupAiActionsOperationally } from './de4ActionGrouping';
+import { groupAiActionsOperationally, type De4ActionGroup } from './de4ActionGrouping';
 
 interface Props {
   isOwner: boolean;
@@ -20,15 +20,13 @@ interface Props {
   refreshToken?: number;
 }
 
-const ACTIVE_STATUSES = new Set([
-  'proposed',
-  'approved',
-  'executing',
-  'executed',
-  'failed',
-  'cancelled',
-  'expired',
-]);
+/** Queue statuses shown in the active section. */
+const QUEUE_STATUSES = new Set(['proposed', 'approved', 'executing']);
+
+/** Terminal statuses shown under "past activities". */
+const PAST_STATUSES = new Set(['executed', 'failed', 'cancelled', 'expired']);
+
+const LISTED_STATUSES = new Set([...QUEUE_STATUSES, ...PAST_STATUSES]);
 
 function paramPreview(item: AiActionItem): string {
   const p = item.parameters || {};
@@ -55,13 +53,14 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<AiActionItem | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [pastExpanded, setPastExpanded] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.listAiActions('all');
-      const filtered = res.items.filter((i) => ACTIVE_STATUSES.has(i.status));
+      const res = await api.listAiActions('all', 100);
+      const filtered = res.items.filter((i) => LISTED_STATUSES.has(i.status));
       setItems(uniqueAiActionItems(filtered));
     } catch {
       setError(t.de4ActionsErrorGeneric);
@@ -92,7 +91,17 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
     load();
   }, [isOwner, enabled, load, refreshToken]);
 
-  const groups = useMemo(() => groupAiActionsOperationally(items), [items]);
+  const activeItems = useMemo(
+    () => items.filter((i) => QUEUE_STATUSES.has(i.status)),
+    [items],
+  );
+  const pastItems = useMemo(
+    () => items.filter((i) => PAST_STATUSES.has(i.status)),
+    [items],
+  );
+
+  const activeGroups = useMemo(() => groupAiActionsOperationally(activeItems), [activeItems]);
+  const pastGroups = useMemo(() => groupAiActionsOperationally(pastItems), [pastItems]);
 
   const safeError = () => setError(t.de4ActionsErrorGeneric);
 
@@ -249,6 +258,47 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
     );
   };
 
+  const renderGroups = (groups: De4ActionGroup[]) => (
+    <ul className="divide-y divide-surface-100">
+      {groups.map((group) => {
+        const leadLabel =
+          group.lead_name || (group.target_entity_id ? `#${group.target_entity_id}` : '—');
+        const expanded = expandedKeys.has(group.key) || group.items.length === 1;
+        const countLabel = t.de4ActionsGroupCount.replace('{count}', String(group.items.length));
+
+        return (
+          <li key={group.key} className="px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => group.target_entity_id && onOpenLead(group.target_entity_id)}
+                  className="text-sm font-semibold text-brand-600 hover:underline"
+                >
+                  {leadLabel}
+                </button>
+                <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-violet-700/80">
+                  {actionTypeLabel(group.action_type, labels)} · {countLabel}
+                </p>
+              </div>
+              {group.items.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
+                >
+                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {expanded ? t.de4ActionsGroupCollapse : t.de4ActionsGroupExpand}
+                </button>
+              ) : null}
+            </div>
+            {expanded ? <ul className="mt-3 space-y-2">{group.items.map(renderActionRow)}</ul> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   return (
     <section className="card overflow-hidden border-violet-100">
       <div className="border-b border-violet-100 bg-violet-50/50 px-4 py-3.5 sm:px-5 sm:py-4">
@@ -260,9 +310,9 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
             <h3 className="text-sm font-semibold text-surface-900 sm:text-base">{t.de4ActionsTitle}</h3>
             <p className="mt-1 text-xs leading-relaxed text-surface-800/60 sm:text-sm">{t.de4ActionsHint}</p>
           </div>
-          {items.length > 0 ? (
+          {activeItems.length > 0 ? (
             <span className="ml-auto rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-violet-900 shadow-sm">
-              {items.length}
+              {activeItems.length}
             </span>
           ) : null}
         </div>
@@ -276,48 +326,56 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
 
       {error ? <p className="px-4 py-3 text-sm text-rose-600 sm:px-5">{error}</p> : null}
 
-      {!loading && items.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-surface-800/50 sm:px-5">{t.de4ActionsEmpty}</p>
-      ) : null}
+      {!loading ? (
+        <>
+          <div className="border-b border-surface-100 px-4 py-2.5 sm:px-5">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-800/55">
+              {t.de4ActionsActiveTitle}
+            </h4>
+          </div>
 
-      <ul className="divide-y divide-surface-100">
-        {groups.map((group) => {
-          const leadLabel =
-            group.lead_name || (group.target_entity_id ? `#${group.target_entity_id}` : '—');
-          const expanded = expandedKeys.has(group.key) || group.items.length === 1;
-          const countLabel = t.de4ActionsGroupCount.replace('{count}', String(group.items.length));
+          {activeItems.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-surface-800/50 sm:px-5">{t.de4ActionsEmpty}</p>
+          ) : (
+            renderGroups(activeGroups)
+          )}
 
-          return (
-            <li key={group.key} className="px-4 py-4 sm:px-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => group.target_entity_id && onOpenLead(group.target_entity_id)}
-                    className="text-sm font-semibold text-brand-600 hover:underline"
-                  >
-                    {leadLabel}
-                  </button>
-                  <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-violet-700/80">
-                    {actionTypeLabel(group.action_type, labels)} · {countLabel}
-                  </p>
-                </div>
-                {group.items.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.key)}
-                    className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
-                  >
-                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    {expanded ? t.de4ActionsGroupCollapse : t.de4ActionsGroupExpand}
-                  </button>
-                ) : null}
+          <div className="border-t border-surface-200 bg-surface-50/60">
+            <button
+              type="button"
+              onClick={() => setPastExpanded((v) => !v)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-5"
+            >
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-800/55">
+                  {t.de4ActionsPastTitle}
+                  {pastItems.length > 0 ? (
+                    <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-surface-800/70 shadow-sm">
+                      {pastItems.length}
+                    </span>
+                  ) : null}
+                </h4>
+                <p className="mt-0.5 text-xs text-surface-800/45">{t.de4ActionsPastHint}</p>
               </div>
-              {expanded ? <ul className="mt-3 space-y-2">{group.items.map(renderActionRow)}</ul> : null}
-            </li>
-          );
-        })}
-      </ul>
+              {pastExpanded ? (
+                <ChevronDown size={16} className="shrink-0 text-surface-800/40" />
+              ) : (
+                <ChevronRight size={16} className="shrink-0 text-surface-800/40" />
+              )}
+            </button>
+
+            {pastExpanded ? (
+              pastItems.length === 0 ? (
+                <p className="px-4 pb-5 text-center text-sm text-surface-800/45 sm:px-5">
+                  {t.de4ActionsPastEmpty}
+                </p>
+              ) : (
+                renderGroups(pastGroups)
+              )
+            ) : null}
+          </div>
+        </>
+      ) : null}
 
       {confirmExecuteItem ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

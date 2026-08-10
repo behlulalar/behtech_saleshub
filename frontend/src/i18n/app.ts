@@ -300,6 +300,10 @@ export interface AppCopy {
     de4ActionsGroupCount: string;
     de4ActionsGroupExpand: string;
     de4ActionsGroupCollapse: string;
+    de4ActionsActiveTitle: string;
+    de4ActionsPastTitle: string;
+    de4ActionsPastHint: string;
+    de4ActionsPastEmpty: string;
     de4ActionsErrorGeneric: string;
     runHistoryTitle: string;
     runHistoryEmpty: string;
@@ -906,6 +910,10 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsGroupCount: '{count} öneri',
       de4ActionsGroupExpand: 'İncele',
       de4ActionsGroupCollapse: 'Gizle',
+      de4ActionsActiveTitle: 'Aktif aksiyonlar',
+      de4ActionsPastTitle: 'Geçmiş aktiviteler',
+      de4ActionsPastHint: 'Uygulanan, iptal edilen veya başarısız aksiyonlar.',
+      de4ActionsPastEmpty: 'Henüz geçmiş aksiyon yok.',
       de4ActionsErrorGeneric: 'İşlem tamamlanamadı. Lütfen tekrar deneyin.',
       runHistoryTitle: 'Son AI işleri',
       runHistoryEmpty: 'Henüz kayıtlı run yok.',
@@ -1530,6 +1538,10 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       de4ActionsGroupCount: '{count} proposals',
       de4ActionsGroupExpand: 'Review',
       de4ActionsGroupCollapse: 'Hide',
+      de4ActionsActiveTitle: 'Active actions',
+      de4ActionsPastTitle: 'Past activities',
+      de4ActionsPastHint: 'Executed, cancelled, or failed actions.',
+      de4ActionsPastEmpty: 'No past actions yet.',
       de4ActionsErrorGeneric: 'Could not complete the action. Please try again.',
       runHistoryTitle: 'Recent AI runs',
       runHistoryEmpty: 'No runs yet.',
