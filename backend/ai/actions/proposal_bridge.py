@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ai.actions.mapper import MAPPER_NO_ACTION, MapperContext, MapperInput, map_recommended_action
 from ai.actions.propose_service import ProposeValidationError, propose_ai_action
+from ai.actions.recommendation_dedup import dedupe_recommended_actions_by_operation
 from ai.actions.schemas import TARGET_ENTITY_LEAD, validate_idempotency_key
 from schemas import DiagnosisRecommendedAction
 
@@ -124,6 +125,10 @@ def bridge_recommended_actions_to_proposals(
         return summary
 
     ctx = MapperContext(lead_id=primary_lead_id, diagnosis_id=diagnosis_id, locale=locale)
+    recommended_actions, dedup_skipped = dedupe_recommended_actions_by_operation(recommended_actions, ctx)
+    summary.skipped_count += dedup_skipped
+
+    seen_operational: set[tuple[str, int]] = set()
 
     for index, rec in enumerate(recommended_actions):
         mapped = map_recommended_action(
@@ -154,6 +159,20 @@ def bridge_recommended_actions_to_proposals(
                 )
             )
             continue
+
+        op_key = (mapped.action_type, lead_id_param)
+        if op_key in seen_operational:
+            summary.skipped_count += 1
+            summary.items.append(
+                ProposalBridgeItemResult(
+                    recommendation_index=index,
+                    outcome="skipped",
+                    action_type=mapped.action_type,
+                    skip_reason="duplicate_operational_recommendation",
+                )
+            )
+            continue
+        seen_operational.add(op_key)
 
         try:
             idem = build_bridge_idempotency_key(

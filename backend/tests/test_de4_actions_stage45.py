@@ -802,12 +802,11 @@ def test_refresh_new_run_different_source(owner_lead):
             primary_lead_id=lead.id,
         )
         db.commit()
-        assert s1.action_ids != s2.action_ids
+        assert s1.action_ids == s2.action_ids
+        assert s2.created_count == 0
         r1 = db.query(AiAction).filter(AiAction.action_id == s1.action_ids[0]).first()
-        r2 = db.query(AiAction).filter(AiAction.action_id == s2.action_ids[0]).first()
         assert r1.source_interpret_run_id == run1
-        assert r2.source_interpret_run_id == run2
-        db.query(AiAction).filter(AiAction.action_id.in_(s1.action_ids + s2.action_ids)).delete()
+        db.query(AiAction).filter(AiAction.action_id.in_(s1.action_ids)).delete()
         db.query(AiRun).filter(AiRun.id.in_([run1, run2])).delete()
         db.commit()
     finally:

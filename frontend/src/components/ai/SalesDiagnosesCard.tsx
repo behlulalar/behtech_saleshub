@@ -4,6 +4,7 @@ import { ApiHttpError, api } from '../../api';
 import { useLocale } from '../../i18n/locale';
 import type { DiagnosisItem, DiagnosisInterpretResponse, DiagnosisPriorityLead } from '../../types';
 import DiagnosisBridgeActionsPanel from './DiagnosisBridgeActionsPanel';
+import { uniqueActionIds } from './de4ActionDedup';
 import { aiPriorityBadgeClass, aiPriorityLabel } from './aiPriorityUi';
 import {
   type InterpretAvailability,
@@ -92,7 +93,7 @@ function InterpretationBody({
 
   const findings = (interp.key_findings ?? []).filter((line) => line?.trim());
   const actions = interp.recommended_actions ?? [];
-  const bridgeActionIds = response.proposal_bridge?.action_ids?.filter(Boolean) ?? [];
+  const bridgeActionIds = uniqueActionIds(response.proposal_bridge?.action_ids?.filter(Boolean) ?? []);
 
   return (
     <div className="space-y-3 text-sm text-surface-800">

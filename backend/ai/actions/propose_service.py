@@ -34,6 +34,13 @@ class ProposeValidationError(ValueError):
 
 INITIAL_PROPOSE_STATUS: ActionStatus = "proposed"
 
+# Active pipeline — block duplicate operational proposals for same target.
+ACTIVE_OPERATIONAL_DUPLICATE_STATUSES: tuple[ActionStatus, ...] = (
+    "proposed",
+    "approved",
+    "executing",
+)
+
 
 def _parse_parameters_json(raw: str) -> dict[str, Any]:
     try:
@@ -160,6 +167,33 @@ def _find_by_idempotency(db: Session, org_id: int, idempotency_key: str) -> AiAc
     )
 
 
+def find_active_operational_proposal(
+    db: Session,
+    org_id: int,
+    *,
+    action_type: str,
+    target_entity: str,
+    target_entity_id: int,
+) -> AiAction | None:
+    """Same org + action_type + target — one active proposal at a time."""
+    entity = (target_entity or "").strip().lower()
+    atype = (action_type or "").strip()
+    if not atype or not target_entity_id or target_entity_id <= 0:
+        return None
+    return (
+        db.query(AiAction)
+        .filter(
+            AiAction.organization_id == org_id,
+            AiAction.action_type == atype,
+            AiAction.target_entity == entity,
+            AiAction.target_entity_id == int(target_entity_id),
+            AiAction.status.in_(ACTIVE_OPERATIONAL_DUPLICATE_STATUSES),
+        )
+        .order_by(AiAction.created_at.desc())
+        .first()
+    )
+
+
 def propose_ai_action(
     db: Session,
     *,
@@ -199,6 +233,19 @@ def propose_ai_action(
         existing = _find_by_idempotency(db, org_id, normalized_key)
         if existing:
             return existing, False
+
+    entity_norm = (target_entity or TARGET_ENTITY_LEAD).strip().lower()
+    tid = int(target_entity_id) if target_entity_id else 0
+    if tid > 0:
+        active_dup = find_active_operational_proposal(
+            db,
+            org_id,
+            action_type=action_type.strip(),
+            target_entity=entity_norm,
+            target_entity_id=tid,
+        )
+        if active_dup:
+            return active_dup, False
 
     try:
         validated_model = validate_params(action_type, parameters)

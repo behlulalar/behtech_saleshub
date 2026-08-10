@@ -259,7 +259,7 @@ def test_deterministic_idempotency_key():
     assert k1.startswith("de3bridge-")
 
 
-def test_refresh_new_run_new_proposal(bridge_on, owner_lead):
+def test_refresh_new_run_reuses_active_proposal(bridge_on, owner_lead):
     _, user, lead = owner_lead
     db = SessionLocal()
     try:
@@ -269,9 +269,16 @@ def test_refresh_new_run_new_proposal(bridge_on, owner_lead):
         s1 = _bridge(db, user, user.id, lead.id, run1, recs)
         s2 = _bridge(db, user, user.id, lead.id, run2, recs)
         db.commit()
-        assert s1.action_ids != s2.action_ids
+        assert s1.action_ids == s2.action_ids
+        assert s2.created_count == 0
+        assert db.query(AiAction).filter(
+            AiAction.organization_id == user.id,
+            AiAction.action_type == "propose_note_append",
+            AiAction.target_entity_id == lead.id,
+            AiAction.status.in_(("proposed", "approved", "executing")),
+        ).count() == 1
         _cleanup_actions_and_run(db, run1, s1.action_ids)
-        _cleanup_actions_and_run(db, run2, s2.action_ids)
+        _cleanup_actions_and_run(db, run2, [])
     finally:
         db.close()
 

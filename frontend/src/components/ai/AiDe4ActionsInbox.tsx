@@ -4,6 +4,7 @@ import { api } from '../../api';
 import { useLocale } from '../../i18n/locale';
 import type { AiActionItem, AiStatusResponse } from '../../types';
 import { actionTypeLabel, formatActionType, statusBadgeClass, statusLabel } from './de4ActionDisplay';
+import { uniqueAiActionItems } from './de4ActionDedup';
 
 interface Props {
   isOwner: boolean;
@@ -37,7 +38,7 @@ export default function AiDe4ActionsInbox({ isOwner, onOpenLead, refreshToken = 
     try {
       const res = await api.listAiActions('all');
       const filtered = res.items.filter((i) => ACTIVE_STATUSES.has(i.status));
-      setItems(filtered);
+      setItems(uniqueAiActionItems(filtered));
     } catch {
       setError(t.de4ActionsErrorGeneric);
       setItems([]);

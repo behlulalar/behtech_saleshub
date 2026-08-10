@@ -238,7 +238,7 @@ def test_stage47_cache_hit_same_run_no_duplicate(owner_lead, monkeypatch):
         settings.ai_de4_interpret_proposal_bridge_enabled = prev
 
 
-def test_stage47_refresh_new_run_new_proposals(owner_lead):
+def test_stage47_refresh_new_run_reuses_active_proposal(owner_lead):
     prev = settings.ai_de4_interpret_proposal_bridge_enabled
     settings.ai_de4_interpret_proposal_bridge_enabled = True
     _, user, lead = owner_lead
@@ -268,13 +268,13 @@ def test_stage47_refresh_new_run_new_proposals(owner_lead):
             primary_lead_id=lead.id,
         )
         db.commit()
-        assert sx.action_ids != sy.action_ids
-        rx = db.query(AiAction).filter(AiAction.source_interpret_run_id == run_x).first()
-        ry = db.query(AiAction).filter(AiAction.source_interpret_run_id == run_y).first()
+        assert sx.action_ids == sy.action_ids
+        assert sy.created_count == 0
+        rx = db.query(AiAction).filter(AiAction.action_id == sx.action_ids[0]).first()
         assert rx.status == "proposed"
-        assert ry.status == "proposed"
+        assert rx.source_interpret_run_id == run_x
         _cleanup_run_actions(db, run_x, sx.action_ids)
-        _cleanup_run_actions(db, run_y, sy.action_ids)
+        _cleanup_run_actions(db, run_y, [])
     finally:
         db.close()
         settings.ai_de4_interpret_proposal_bridge_enabled = prev

@@ -8,6 +8,7 @@ import {
   statusBadgeClass,
   statusLabel,
 } from './de4ActionDisplay';
+import { uniqueActionIds, uniqueAiActionItems } from './de4ActionDedup';
 
 type Props = {
   actionIds: string[];
@@ -30,18 +31,19 @@ export default function DiagnosisBridgeActionsPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmActionId, setConfirmActionId] = useState<string | null>(null);
 
-  const idsKey = actionIds.join(',');
+  const idsKey = uniqueActionIds(actionIds).join(',');
 
   const load = useCallback(async () => {
-    if (actionIds.length === 0) {
+    const ids = uniqueActionIds(actionIds);
+    if (ids.length === 0) {
       setItems([]);
       return;
     }
     setLoading(true);
     setError(false);
     try {
-      const rows = await Promise.all(actionIds.map((id) => api.getAiAction(id)));
-      setItems(rows);
+      const rows = await Promise.all(ids.map((id) => api.getAiAction(id)));
+      setItems(uniqueAiActionItems(rows));
     } catch {
       setError(true);
       setItems([]);
