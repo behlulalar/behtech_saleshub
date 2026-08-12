@@ -80,6 +80,16 @@ Sonra 2–3 satır genel durum (follow-up / teklif / diagnosis / satış metriğ
 Conversation memory kimlik bağlamı sağlar; CRM gerçeği tool'dan gelir.
 Memory eski teklifi tool'suz kesin doğru sayma.
 
+## Conversational entity continuity (DE-6.7)
+ACTIVE_CONVERSATIONAL_LEAD set ise ve kullanıcı örtük follow-up soruyorsa
+(peki / onun / neden kapanmadı / son aktivite / teklif tarihi):
+→ AYNI lead üzerinde kal; başka lead'e geçme; search_leads ile rastgele seçme.
+Kullanıcı açıkça başka işletme adı söylerse o lead'e geç.
+Broad sorular (bugün ne yapmalıyım / bekleyen teklifler / en kritik leadler):
+→ portfolio tool'ları; tek lead'e zorlama.
+"Neden kapanmadı?" için CRM'de sebep yoksa uydurma; "CRM'de doğrulanmış neden yok"
+deyip teklif/durum/aktivite özetle.
+
 ## Eşleşme / güvenlik
 search_leads.ambiguous=true veya count>1 → netleştir; yanlış lead seçme.
 organization_id / org_id / user_id tool argümanı ASLA gönderme.
@@ -123,10 +133,13 @@ def build_chat_messages(
     history: list[dict] | None,
     user_message: str,
     context_json: str | None = None,
+    entity_hint: str | None = None,
 ) -> list[dict]:
     from ai.capabilities.chat import normalize_history
 
     system = f"{SYSTEM_TOOLS}\nDil tercihi: {locale}"
+    if entity_hint:
+        system += entity_hint
     if context_json:
         system += (
             "\n\nYüksek seviye CRM özeti (referans; kesin rakam/tarih için tool kullan):\n"
@@ -138,12 +151,47 @@ def build_chat_messages(
     return messages
 
 
+def _execute_bound_tool(
+    db: Session,
+    org_id: int,
+    *,
+    name: str,
+    args: dict,
+    entity_ctx: dict[str, Any] | None,
+) -> tuple[str, dict, dict]:
+    """Sanitize/rewrite args, execute tool, optionally refresh active entity."""
+    from ai.entity_continuity import (
+        entity_from_tool_result,
+        rewrite_tool_call_for_entity,
+    )
+
+    cleaned = _sanitize_args(args)
+    bind = bool((entity_ctx or {}).get("bind_for_tools"))
+    entity = (entity_ctx or {}).get("entity")
+    user_message = str((entity_ctx or {}).get("user_message") or "")
+    name2, args2 = rewrite_tool_call_for_entity(
+        tool_name=name,
+        args=cleaned,
+        entity=entity,
+        bind_for_tools=bind,
+        user_message=user_message,
+    )
+    result = execute_crm_tool(db, org_id, name2, args2)
+    if entity_ctx is not None:
+        refreshed = entity_from_tool_result(db, org_id, tool_name=name2, result=result)
+        if refreshed is not None:
+            entity_ctx["entity"] = refreshed
+            entity_ctx["dirty"] = True
+    return name2, args2, result
+
+
 def run_tool_loop(
     db: Session,
     *,
     org_id: int,
     messages: list[dict],
     run: AiRun | None = None,
+    entity_ctx: dict[str, Any] | None = None,
 ) -> tuple[str, dict, list[dict]]:
     """Returns (reply, usage_totals, tool_trace)."""
     assert_llm_configured()
@@ -168,13 +216,15 @@ def run_tool_loop(
         for tc in tool_calls:
             fn = tc.get("function") or {}
             name = str(fn.get("name") or "")
-            args = _sanitize_args(_parse_tool_args(str(fn.get("arguments") or "{}")))
+            args = _parse_tool_args(str(fn.get("arguments") or "{}"))
             started = time.perf_counter()
-            result = execute_crm_tool(db, org_id, name, args)
+            name2, _args2, result = _execute_bound_tool(
+                db, org_id, name=name, args=args, entity_ctx=entity_ctx
+            )
             duration_ms = int((time.perf_counter() - started) * 1000)
             step = {
                 "type": "tool",
-                "tool": name,
+                "tool": name2,
                 "success": bool(result.get("ok")),
                 "duration_ms": duration_ms,
                 "iteration": iteration,
@@ -218,6 +268,7 @@ def iter_tool_aware_chat_events(
     org_id: int,
     messages: list[dict],
     run: AiRun,
+    entity_ctx: dict[str, Any] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Yield tool_start / tool_done / delta events; ends with _internal_done."""
     assert_llm_configured()
@@ -241,14 +292,17 @@ def iter_tool_aware_chat_events(
         for tc in tool_calls:
             fn = tc.get("function") or {}
             name = str(fn.get("name") or "")
-            args = _sanitize_args(_parse_tool_args(str(fn.get("arguments") or "{}")))
+            args = _parse_tool_args(str(fn.get("arguments") or "{}"))
+            # Status label uses pre-rewrite name for UX continuity when redirected.
             yield {
                 "type": "tool_start",
                 "tool": name,
                 "status": TOOL_STATUS_LABELS.get(name, "CRM inceleniyor…"),
             }
             started = time.perf_counter()
-            result = execute_crm_tool(db, org_id, name, args)
+            name2, _args2, result = _execute_bound_tool(
+                db, org_id, name=name, args=args, entity_ctx=entity_ctx
+            )
             duration_ms = int((time.perf_counter() - started) * 1000)
             append_run_step(
                 db,
@@ -256,7 +310,7 @@ def iter_tool_aware_chat_events(
                 redact_run_step(
                     {
                         "type": "tool",
-                        "tool": name,
+                        "tool": name2,
                         "success": bool(result.get("ok")),
                         "duration_ms": duration_ms,
                         "iteration": iteration,
@@ -266,8 +320,8 @@ def iter_tool_aware_chat_events(
             )
             yield {
                 "type": "tool_done",
-                "tool": name,
-                "status": TOOL_STATUS_LABELS.get(name, "CRM incelendi"),
+                "tool": name2,
+                "status": TOOL_STATUS_LABELS.get(name2, "CRM incelendi"),
             }
             working.append(
                 {

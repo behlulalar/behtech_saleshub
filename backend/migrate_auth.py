@@ -438,6 +438,15 @@ def run_migrations(db: Session) -> None:
         AssistantMessage.__table__.create(bind=db.bind, checkfirst=True)
         db.commit()
 
+    # DE-6.7 — conversational active entity pointer (additive column only).
+    inspector = inspect(db.bind)
+    tables = inspector.get_table_names()
+    if "assistant_conversations" in tables:
+        cols = {c["name"] for c in inspector.get_columns("assistant_conversations")}
+        if "active_entity_json" not in cols:
+            db.execute(text("ALTER TABLE assistant_conversations ADD COLUMN active_entity_json TEXT"))
+            db.commit()
+
 
 def seed_user_defaults(db: Session, user_id: int, account_type: str = ACCOUNT_TYPE_COMPANY) -> None:
     categories = (

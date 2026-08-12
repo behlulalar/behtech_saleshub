@@ -84,11 +84,38 @@ def run_sales_chat(
 
     include_revenue = (user.account_type or "company") == "company"
     context = _build_context_block(db, org_id, include_revenue=include_revenue)
+
+    from ai.entity_continuity import (
+        active_entity_system_hint,
+        resolve_conversational_entity,
+        set_conversation_active_entity,
+    )
+
+    resolution = resolve_conversational_entity(
+        db,
+        org_id=org_id,
+        conversation=conversation,
+        user_message=text,
+    )
+    if conversation is not None and resolution.persist:
+        set_conversation_active_entity(db, conversation, resolution.entity)
+        db.flush()
+
+    entity_ctx = {
+        "entity": resolution.entity,
+        "bind_for_tools": resolution.bind_for_tools,
+        "user_message": text,
+        "dirty": False,
+    }
     messages = build_chat_messages(
         locale=locale,
         history=history,
         user_message=text,
         context_json=context,
+        entity_hint=active_entity_system_hint(
+            resolution.entity,
+            bind_for_tools=resolution.bind_for_tools,
+        ),
     )
 
     provider, model = provider_and_model()
@@ -102,6 +129,8 @@ def run_sales_chat(
             "message_len": len(text),
             "conversation_id": conversation.id if conversation is not None else None,
             "tools": True,
+            "entity_reason": resolution.reason,
+            "entity_bound": bool(resolution.bind_for_tools and resolution.entity),
         },
         provider=provider,
         model=model,
@@ -116,6 +145,7 @@ def run_sales_chat(
             org_id=org_id,
             messages=messages,
             run=run,
+            entity_ctx=entity_ctx,
         )
         reply = (reply or "").strip()
         if not reply:
@@ -148,6 +178,8 @@ def run_sales_chat(
                 include_archived=False,
             )
             if live is not None:
+                if entity_ctx.get("dirty") and entity_ctx.get("entity") is not None:
+                    set_conversation_active_entity(db, live, entity_ctx["entity"])
                 append_message(
                     db,
                     conversation=live,
