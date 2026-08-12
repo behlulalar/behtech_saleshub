@@ -27,12 +27,19 @@ function makeTitle(text: string) {
 function loadConversations(): Conversation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      const now = new Date().toISOString();
+      return [{ id: 'c_default', title: 'Yeni sohbet', messages: [], createdAt: now, updatedAt: now }];
+    }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item && typeof item.id === 'string' && Array.isArray(item.messages));
+    const filtered = parsed.filter((item) => item && typeof item.id === 'string' && Array.isArray(item.messages));
+    if (filtered.length > 0) return filtered;
+    const now = new Date().toISOString();
+    return [{ id: 'c_default', title: 'Yeni sohbet', messages: [], createdAt: now, updatedAt: now }];
   } catch {
-    return [];
+    const now = new Date().toISOString();
+    return [{ id: 'c_default', title: 'Yeni sohbet', messages: [], createdAt: now, updatedAt: now }];
   }
 }
 
@@ -174,12 +181,7 @@ export default function SalesAssistantPage() {
             <Sparkles size={17} className="text-brand-600" />
             {isEnglish ? 'Sales Assistant' : 'Satış Asistanı'}
           </div>
-          <button
-            type="button"
-            onClick={createConversation}
-            className="rounded-lg p-2 text-surface-700 hover:bg-white hover:text-brand-600"
-            title={isEnglish ? 'New chat' : 'Yeni sohbet'}
-          >
+          <button type="button" onClick={createConversation} className="rounded-lg p-2 text-surface-700 hover:bg-white hover:text-brand-600" title={isEnglish ? 'New chat' : 'Yeni sohbet'}>
             <MessageSquarePlus size={18} />
           </button>
         </div>
@@ -195,15 +197,8 @@ export default function SalesAssistantPage() {
                 <button
                   key={conversation.id}
                   type="button"
-                  onClick={() => {
-                    setActiveId(conversation.id);
-                    setError(null);
-                  }}
-                  className={`flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                    conversation.id === activeId
-                      ? 'bg-white text-surface-900 shadow-sm ring-1 ring-surface-200'
-                      : 'text-surface-700 hover:bg-white/80'
-                  }`}
+                  onClick={() => { setActiveId(conversation.id); setError(null); }}
+                  className={`flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${conversation.id === activeId ? 'bg-white text-surface-900 shadow-sm ring-1 ring-surface-200' : 'text-surface-700 hover:bg-white/80'}`}
                 >
                   <MessageSquarePlus size={15} className="mt-0.5 shrink-0 opacity-50" />
                   <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
@@ -216,27 +211,14 @@ export default function SalesAssistantPage() {
 
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-surface-200 px-3 sm:px-5">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen((open) => !open)}
-            className="rounded-lg p-2 text-surface-600 hover:bg-surface-100"
-            title={isEnglish ? 'Toggle conversations' : 'Sohbetleri göster/gizle'}
-          >
+          <button type="button" onClick={() => setSidebarOpen((open) => !open)} className="rounded-lg p-2 text-surface-600 hover:bg-surface-100" title={isEnglish ? 'Toggle conversations' : 'Sohbetleri göster/gizle'}>
             {sidebarOpen ? <ChevronLeft size={18} /> : <PanelLeft size={18} />}
           </button>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-surface-900 sm:text-base">
-              {active?.title || (isEnglish ? 'Sales Assistant' : 'Satış Asistanı')}
-            </h2>
-            <p className="text-[11px] text-surface-500">
-              {isEnglish ? 'Read-only CRM intelligence' : 'CRM verileri üzerinden read-only satış zekâsı'}
-            </p>
+            <h2 className="truncate text-sm font-semibold text-surface-900 sm:text-base">{active?.title || (isEnglish ? 'Sales Assistant' : 'Satış Asistanı')}</h2>
+            <p className="text-[11px] text-surface-500">{isEnglish ? 'Read-only CRM intelligence' : 'CRM verileri üzerinden read-only satış zekâsı'}</p>
           </div>
-          <button
-            type="button"
-            onClick={createConversation}
-            className="btn-secondary ml-auto px-2.5 py-2 text-xs"
-          >
+          <button type="button" onClick={createConversation} className="btn-secondary ml-auto px-2.5 py-2 text-xs">
             <MessageSquarePlus size={15} />
             <span className="hidden sm:inline">{isEnglish ? 'New chat' : 'Yeni sohbet'}</span>
           </button>
@@ -246,30 +228,12 @@ export default function SalesAssistantPage() {
           <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end">
             {!active || active.messages.length === 0 ? (
               <div className="mx-auto w-full max-w-2xl py-10 text-center sm:py-16">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                  <Bot size={28} />
-                </div>
-                <h3 className="text-2xl font-bold tracking-tight text-surface-900">
-                  {isEnglish ? 'What do you want to know?' : 'Bugün neyi öğrenmek istiyorsun?'}
-                </h3>
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-surface-500">
-                  {isEnglish
-                    ? 'Ask about leads, offers, activities, sales and diagnosis data. Answers are grounded in your CRM.'
-                    : 'Lead, teklif, aktivite, satış ve diagnosis verilerini sor. Cevaplar doğrudan CRM kayıtlarına dayanır.'}
-                </p>
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><Bot size={28} /></div>
+                <h3 className="text-2xl font-bold tracking-tight text-surface-900">{isEnglish ? 'What do you want to know?' : 'Bugün neyi öğrenmek istiyorsun?'}</h3>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-surface-500">{isEnglish ? 'Ask about leads, offers, activities, sales and diagnosis data. Answers are grounded in your CRM.' : 'Lead, teklif, aktivite, satış ve diagnosis verilerini sor. Cevaplar doğrudan CRM kayıtlarına dayanır.'}</p>
                 <div className="mt-6 grid gap-2 text-left sm:grid-cols-2">
-                  {(isEnglish
-                    ? ['What did we offer Roof Tattoo Sakarya?', 'Which leads need follow-up?', 'What happened this month?', 'Why are sales slowing down?']
-                    : ['Roof Tattoo Sakarya\'ya ne teklif vermiştik?', 'Hangi lead\'leri takip etmeliyiz?', 'Bu ay satışlarda ne oldu?', 'Satışlar neden yavaşlıyor?']
-                  ).map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => setInput(prompt)}
-                      className="rounded-xl border border-surface-200 bg-white px-4 py-3 text-left text-sm text-surface-700 transition hover:border-brand-300 hover:bg-brand-50/30"
-                    >
-                      {prompt}
-                    </button>
+                  {(isEnglish ? ['What did we offer Roof Tattoo Sakarya?', 'Which leads need follow-up?', 'What happened this month?', 'Why are sales slowing down?'] : ['Roof Tattoo Sakarya\'ya ne teklif vermiştik?', 'Hangi lead\'leri takip etmeliyiz?', 'Bu ay satışlarda ne oldu?', 'Satışlar neden yavaşlıyor?']).map((prompt) => (
+                    <button key={prompt} type="button" onClick={() => setInput(prompt)} className="rounded-xl border border-surface-200 bg-white px-4 py-3 text-left text-sm text-surface-700 transition hover:border-brand-300 hover:bg-brand-50/30">{prompt}</button>
                   ))}
                 </div>
               </div>
@@ -277,13 +241,7 @@ export default function SalesAssistantPage() {
               <div className="space-y-5 pb-6">
                 {active.messages.map((message, index) => (
                   <div key={`${active.id}-${index}`} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                    <div
-                      className={
-                        message.role === 'user'
-                          ? 'max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-4 py-3 text-sm leading-relaxed text-white shadow-sm'
-                          : 'max-w-[92%] rounded-2xl rounded-bl-md bg-surface-50 px-4 py-3 text-sm leading-7 text-surface-800 ring-1 ring-surface-100'
-                      }
-                    >
+                    <div className={message.role === 'user' ? 'max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-4 py-3 text-sm leading-relaxed text-white shadow-sm' : 'max-w-[92%] rounded-2xl rounded-bl-md bg-surface-50 px-4 py-3 text-sm leading-7 text-surface-800 ring-1 ring-surface-100'}>
                       {message.content || (loading && index === active.messages.length - 1 ? <Loader2 size={16} className="animate-spin" /> : null)}
                     </div>
                   </div>
@@ -297,32 +255,12 @@ export default function SalesAssistantPage() {
           <div className="mx-auto max-w-3xl">
             {error ? <p className="mb-2 text-xs text-rose-600">{error}</p> : null}
             <div className="flex items-end gap-2 rounded-2xl border border-surface-300 bg-white p-2 shadow-sm focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100">
-              <textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    send();
-                  }
-                }}
-                rows={1}
-                placeholder={isEnglish ? 'Ask about your CRM…' : 'CRM hakkında bir şey sor…'}
-                className="min-h-[42px] max-h-32 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-surface-400"
-              />
-              <button
-                type="button"
-                onClick={send}
-                disabled={loading || !input.trim()}
-                className="btn-primary h-10 w-10 shrink-0 rounded-xl p-0"
-                aria-label={isEnglish ? 'Send' : 'Gönder'}
-              >
+              <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} rows={1} placeholder={isEnglish ? 'Ask about your CRM…' : 'CRM hakkında bir şey sor…'} className="min-h-[42px] max-h-32 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-surface-400" />
+              <button type="button" onClick={send} disabled={loading || !input.trim()} className="btn-primary h-10 w-10 shrink-0 rounded-xl p-0" aria-label={isEnglish ? 'Send' : 'Gönder'}>
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               </button>
             </div>
-            <p className="mt-2 text-center text-[10px] text-surface-400">
-              {isEnglish ? 'AI answers are grounded in CRM data. Verify critical information.' : 'AI yanıtları CRM verilerine dayanır. Kritik bilgileri kayıt üzerinden doğrula.'}
-            </p>
+            <p className="mt-2 text-center text-[10px] text-surface-400">{isEnglish ? 'AI answers are grounded in CRM data. Verify critical information.' : 'AI yanıtları CRM verilerine dayanır. Kritik bilgileri kayıt üzerinden doğrula.'}</p>
           </div>
         </div>
       </section>
