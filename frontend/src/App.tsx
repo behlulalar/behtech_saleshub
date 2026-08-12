@@ -975,13 +975,23 @@ function App() {
             />
             </div>
           ) : intelligenceView ? (
-            <div className="mobile-scroll-pane h-full lg:overflow-y-auto">
-              <IntelligencePage
-                view={intelligenceView}
-                isOwner={isOwner}
-                onEditLead={handleEditFromDashboard}
-              />
-            </div>
+            intelligenceView === 'intel-assistant' ? (
+              <div className="h-full min-h-0 overflow-hidden">
+                <IntelligencePage
+                  view={intelligenceView}
+                  isOwner={isOwner}
+                  onEditLead={handleEditFromDashboard}
+                />
+              </div>
+            ) : (
+              <div className="mobile-scroll-pane h-full lg:overflow-y-auto">
+                <IntelligencePage
+                  view={intelligenceView}
+                  isOwner={isOwner}
+                  onEditLead={handleEditFromDashboard}
+                />
+              </div>
+            )
           ) : isRequests ? (
             <RequestsPage
               requests={requests}

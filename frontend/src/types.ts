@@ -774,12 +774,42 @@ export interface AiChatRequest {
   message: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
   locale?: string;
+  conversation_id?: number;
 }
 
 export interface AiChatResponse {
   reply: string;
   run_id: number;
   disclaimer: string;
+  conversation_id?: number | null;
+}
+
+export interface AssistantConversation {
+  id: number;
+  user_id: number;
+  organization_id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  archived_at?: string | null;
+}
+
+export interface AssistantMessage {
+  id: number;
+  conversation_id: number;
+  role: 'user' | 'assistant' | string;
+  content: string;
+  created_at: string;
+  run_id?: number | null;
+}
+
+export interface AssistantConversationListResponse {
+  items: AssistantConversation[];
+}
+
+export interface AssistantConversationDetailResponse {
+  conversation: AssistantConversation;
+  messages: AssistantMessage[];
 }
 
 export interface SuggestMessageRequest {

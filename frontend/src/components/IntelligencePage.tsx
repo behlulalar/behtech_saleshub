@@ -4,6 +4,7 @@ import AiDe4ActionsInbox from './ai/AiDe4ActionsInbox';
 import AiOpsPanel from './ai/AiOpsPanel';
 import AiPriorityList from './ai/AiPriorityList';
 import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
+import SalesAssistantPage from './ai/SalesAssistantPage';
 import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
 import type { IntelligenceView } from '../types';
 
@@ -32,6 +33,7 @@ export default function IntelligencePage({ view, isOwner, onEditLead }: Props) {
             onOpenLead={onEditLead}
             onProposalQueued={bumpProposals}
           />
+          <AiOpsPanel isOwner={isOwner} />
         </div>
       );
     case 'intel-diagnoses':
@@ -57,8 +59,8 @@ export default function IntelligencePage({ view, isOwner, onEditLead }: Props) {
       );
     case 'intel-assistant':
       return (
-        <div className="min-w-0 space-y-6 max-lg:space-y-4">
-          <AiOpsPanel isOwner={isOwner} />
+        <div className="flex h-full min-h-0 min-w-0 flex-col">
+          <SalesAssistantPage />
         </div>
       );
     default:

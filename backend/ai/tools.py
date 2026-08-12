@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ai.crm_tools import execute_crm_tool
 from database import CategoryModel, Lead
 from intelligence.analytics_engine import compute_kpis
 from intelligence.insights import insight_to_dict, list_active_insights
@@ -90,11 +91,7 @@ def tool_get_insights(db: Session, org_id: int, *, limit: int = 10) -> dict:
     }
 
 
-TOOL_REGISTRY = {
-    "get_lead": {
-        "args": {"lead_id": "int"},
-        "fn": lambda db, org_id, args: tool_get_lead(db, org_id, lead_id=int(args["lead_id"])),
-    },
+_LEGACY_REGISTRY = {
     "list_leads": {
         "args": {"limit": "int?", "ranked": "bool?"},
         "fn": lambda db, org_id, args: tool_list_leads(
@@ -106,19 +103,58 @@ TOOL_REGISTRY = {
     },
     "get_kpis": {
         "args": {"period_type": "str?"},
-        "fn": lambda db, org_id, args: tool_get_kpis(db, org_id, period_type=str(args.get("period_type") or "monthly")),
+        "fn": lambda db, org_id, args: tool_get_kpis(
+            db, org_id, period_type=str(args.get("period_type") or "monthly")
+        ),
     },
     "get_insights": {
         "args": {"limit": "int?"},
-        "fn": lambda db, org_id, args: tool_get_insights(db, org_id, limit=int(args.get("limit") or 10)),
+        "fn": lambda db, org_id, args: tool_get_insights(
+            db, org_id, limit=int(args.get("limit") or 10)
+        ),
     },
+}
+
+_CRM_TOOL_NAMES = frozenset(
+    {
+        "search_leads",
+        "get_lead",
+        "get_lead_offer",
+        "get_lead_activities",
+        "get_sales_metrics",
+        "get_followup_candidates",
+        "get_diagnoses",
+        "get_diagnosis",
+        "get_pending_offers",
+        "get_daily_sales_brief",
+    }
+)
+
+TOOL_REGISTRY = {
+    **_LEGACY_REGISTRY,
+    "get_lead": {"args": {"lead_id": "int"}, "crm": True},
+    "search_leads": {"args": {"query": "str"}, "crm": True},
+    "get_lead_offer": {"args": {"lead_id": "int"}, "crm": True},
+    "get_lead_activities": {"args": {"lead_id": "int", "limit": "int?"}, "crm": True},
+    "get_sales_metrics": {"args": {"period": "str"}, "crm": True},
+    "get_followup_candidates": {"args": {"limit": "int?"}, "crm": True},
+    "get_diagnoses": {
+        "args": {"severity": "str?", "diagnosis_type": "str?", "limit": "int?"},
+        "crm": True,
+    },
+    "get_diagnosis": {"args": {"diagnosis_id": "str"}, "crm": True},
+    "get_pending_offers": {"args": {"limit": "int?", "min_age_days": "int?"}, "crm": True},
+    "get_daily_sales_brief": {"args": {"limit": "int?"}, "crm": True},
 }
 
 
 def execute_tool(db: Session, org_id: int, tool_name: str, args: dict) -> dict:
+    if tool_name in _CRM_TOOL_NAMES:
+        return execute_crm_tool(db, org_id, tool_name, args or {})
+
     entry = TOOL_REGISTRY.get(tool_name)
-    if not entry:
-        raise ToolError("unknown_tool")
+    if not entry or "fn" not in entry:
+        return {"ok": False, "tool": tool_name, "error": "unknown_tool"}
     try:
         result = entry["fn"](db, org_id, args or {})
         return {"ok": True, "tool": tool_name, "result": result}

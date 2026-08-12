@@ -685,12 +685,50 @@ class AiChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     history: list[AiChatHistoryItem] = Field(default_factory=list, max_length=8)
     locale: str = Field(default="tr", max_length=8)
+    conversation_id: Optional[int] = Field(default=None, gt=0)
 
 
 class AiChatResponse(BaseModel):
     reply: str
     run_id: int
     disclaimer: str
+    conversation_id: Optional[int] = None
+
+
+class AssistantConversationCreateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+
+
+class AssistantConversationUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+
+
+class AssistantMessageItem(BaseModel):
+    id: int
+    conversation_id: int
+    role: str
+    content: str
+    created_at: datetime
+    run_id: Optional[int] = None
+
+
+class AssistantConversationItem(BaseModel):
+    id: int
+    user_id: int
+    organization_id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    archived_at: Optional[datetime] = None
+
+
+class AssistantConversationListResponse(BaseModel):
+    items: list[AssistantConversationItem]
+
+
+class AssistantConversationDetailResponse(BaseModel):
+    conversation: AssistantConversationItem
+    messages: list[AssistantMessageItem]
 
 
 class SuggestMessageRequest(BaseModel):

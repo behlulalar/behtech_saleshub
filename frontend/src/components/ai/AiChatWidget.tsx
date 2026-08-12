@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { Loader2, MessageCircle, Plus, Send, Sparkles, X } from 'lucide-react';
 import { api } from '../../api';
 import { useLocale } from '../../i18n/locale';
-import type { AiStatusResponse } from '../../types';
+import type { AiStatusResponse, AssistantConversation } from '../../types';
 
-type ChatTurn = { role: 'user' | 'assistant'; content: string };
+type ChatTurn = { role: 'user' | 'assistant'; content: string; id?: number };
 
 export default function AiChatWidget() {
   const { app, locale } = useLocale();
@@ -14,9 +14,14 @@ export default function AiChatWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [conversations, setConversations] = useState<AssistantConversation[]>([]);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bootRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,31 +42,105 @@ export default function AiChatWidget() {
     if (open && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [turns, open, loading, streaming]);
+  }, [turns, open, loading, streaming, toolStatus]);
+
+  const loadConversation = useCallback(
+    async (id: number) => {
+      const detail = await api.getAssistantConversation(id);
+      setConversationId(detail.conversation.id);
+      setTurns(
+        detail.messages.map((m) => ({
+          id: m.id,
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        })),
+      );
+    },
+    [],
+  );
+
+  const bootstrap = useCallback(async () => {
+    setBootLoading(true);
+    setError(null);
+    try {
+      const list = await api.listAssistantConversations();
+      setConversations(list.items);
+      if (list.items.length > 0) {
+        await loadConversation(list.items[0].id);
+      } else {
+        const created = await api.createAssistantConversation();
+        setConversations([created]);
+        setConversationId(created.id);
+        setTurns([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.loadFailed);
+    } finally {
+      setBootLoading(false);
+    }
+  }, [loadConversation, t.loadFailed]);
+
+  useEffect(() => {
+    if (!open || !available) return;
+    if (bootRef.current) return;
+    bootRef.current = true;
+    void bootstrap();
+  }, [open, available, bootstrap]);
+
+  const startNewConversation = useCallback(async () => {
+    if (loading) return;
+    setError(null);
+    setBootLoading(true);
+    try {
+      const created = await api.createAssistantConversation();
+      setConversations((prev) => [created, ...prev]);
+      setConversationId(created.id);
+      setTurns([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.loadFailed);
+    } finally {
+      setBootLoading(false);
+    }
+  }, [loading, t.loadFailed]);
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || bootLoading) return;
     setInput('');
     setError(null);
+
+    let activeId = conversationId;
+    if (activeId == null) {
+      try {
+        const created = await api.createAssistantConversation();
+        activeId = created.id;
+        setConversationId(created.id);
+        setConversations((prev) => [created, ...prev]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.sendFailed);
+        return;
+      }
+    }
+
     const userTurn: ChatTurn = { role: 'user', content: text };
     setTurns((prev) => [...prev, userTurn, { role: 'assistant', content: '' }]);
     setLoading(true);
     setStreaming(false);
+    setToolStatus(null);
     let sawDelta = false;
     try {
-      const history = turns.map((x) => ({ role: x.role, content: x.content }));
       let accumulated = '';
       await api.streamAiChat(
         {
           message: text,
-          history,
+          conversation_id: activeId,
           locale: locale === 'en' ? 'en' : 'tr',
         },
         (delta) => {
           if (!sawDelta) {
             sawDelta = true;
             setStreaming(true);
+            setToolStatus(null);
           }
           accumulated += delta;
           const snapshot = accumulated;
@@ -71,7 +150,10 @@ export default function AiChatWidget() {
             return copy;
           });
         },
+        (status) => setToolStatus(status),
       );
+      // Refresh title / ordering from server (non-blocking).
+      void api.listAssistantConversations().then((list) => setConversations(list.items)).catch(() => {});
     } catch (err) {
       setTurns((prev) => {
         if (prev.length && prev[prev.length - 1].role === 'assistant' && !prev[prev.length - 1].content) {
@@ -83,8 +165,9 @@ export default function AiChatWidget() {
     } finally {
       setLoading(false);
       setStreaming(false);
+      setToolStatus(null);
     }
-  }, [input, loading, locale, t.sendFailed, turns]);
+  }, [bootLoading, conversationId, input, loading, locale, t.sendFailed]);
 
   if (!available) return null;
 
@@ -124,18 +207,60 @@ export default function AiChatWidget() {
                   <p className="text-[11px] text-surface-800/55">{t.subtitle}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg p-2 text-surface-800/50 hover:bg-white"
-                aria-label={t.close}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => void startNewConversation()}
+                  disabled={loading || bootLoading}
+                  className="rounded-lg p-2 text-surface-800/50 hover:bg-white disabled:opacity-40"
+                  aria-label={t.newChat}
+                  title={t.newChat}
+                >
+                  <Plus size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg p-2 text-surface-800/50 hover:bg-white"
+                  aria-label={t.close}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
+            {conversations.length > 1 ? (
+              <div className="flex gap-1 overflow-x-auto border-b border-surface-100 px-3 py-2">
+                {conversations.slice(0, 8).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={loading || bootLoading}
+                    onClick={() => {
+                      void loadConversation(c.id).catch((err) => {
+                        setError(err instanceof Error ? err.message : t.loadFailed);
+                      });
+                    }}
+                    className={
+                      c.id === conversationId
+                        ? 'shrink-0 rounded-lg bg-brand-500/10 px-2.5 py-1 text-[11px] font-medium text-brand-700'
+                        : 'shrink-0 rounded-lg px-2.5 py-1 text-[11px] text-surface-800/60 hover:bg-surface-50'
+                    }
+                  >
+                    {(c.title || t.untitled).slice(0, 28)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {turns.length === 0 ? (
+              {bootLoading && turns.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-surface-800/50">
+                  <Loader2 size={16} className="animate-spin" />
+                  {t.loadingHistory}
+                </div>
+              ) : null}
+              {!bootLoading && turns.length === 0 ? (
                 <p className="text-sm leading-relaxed text-surface-800/55">{t.emptyHint}</p>
               ) : null}
               {turns.map((turn, idx) => {
@@ -143,22 +268,28 @@ export default function AiChatWidget() {
                   return null;
                 }
                 return (
-                <div
-                  key={`${idx}-${turn.role}`}
-                  className={
-                    turn.role === 'user'
-                      ? 'ml-8 rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-surface-900'
-                      : 'mr-4 rounded-xl bg-surface-50 px-3 py-2 text-sm leading-relaxed text-surface-800/90 ring-1 ring-surface-100'
-                  }
-                >
-                  {turn.content}
-                </div>
+                  <div
+                    key={turn.id ?? `${idx}-${turn.role}`}
+                    className={
+                      turn.role === 'user'
+                        ? 'ml-8 rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-surface-900'
+                        : 'mr-4 rounded-xl bg-surface-50 px-3 py-2 text-sm leading-relaxed text-surface-800/90 ring-1 ring-surface-100'
+                    }
+                  >
+                    {turn.content}
+                  </div>
                 );
               })}
               {loading && !streaming ? (
                 <div className="flex items-center gap-2 text-sm text-surface-800/50">
                   <Loader2 size={16} className="animate-spin" />
-                  {t.thinking}
+                  {toolStatus || t.thinking}
+                </div>
+              ) : null}
+              {loading && streaming && toolStatus ? (
+                <div className="flex items-center gap-2 text-sm text-surface-800/50">
+                  <Loader2 size={16} className="animate-spin" />
+                  {toolStatus}
                 </div>
               ) : null}
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}
@@ -175,14 +306,14 @@ export default function AiChatWidget() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      send();
+                      void send();
                     }
                   }}
                 />
                 <button
                   type="button"
-                  disabled={loading || !input.trim()}
-                  onClick={send}
+                  disabled={loading || bootLoading || !input.trim()}
+                  onClick={() => void send()}
                   className="btn-primary shrink-0 self-end px-3 py-2.5"
                   aria-label={t.send}
                 >

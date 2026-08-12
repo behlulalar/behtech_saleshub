@@ -107,6 +107,14 @@ class Settings(BaseSettings):
     ai_diagnosis_history_interpret_cache_ttl_hours: int = 48
     ai_diagnosis_history_interpret_estimated_tokens: int = 1400
 
+    # DE-6.5 — optional Redis working memory (default OFF; PG remains authoritative)
+    assistant_memory_enabled: bool = False
+    assistant_memory_redis_url: str = "redis://127.0.0.1:6379/0"
+    assistant_memory_ttl_seconds: int = 86400
+    assistant_memory_max_messages: int = 12
+    assistant_memory_max_chars: int = 14000
+    assistant_memory_socket_timeout_sec: float = 0.5
+
     model_config = SettingsConfigDict(env_file=".env")
 
     @property

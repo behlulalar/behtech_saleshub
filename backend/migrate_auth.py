@@ -421,6 +421,23 @@ def run_migrations(db: Session) -> None:
         DiagnosisSnapshot.__table__.create(bind=db.bind, checkfirst=True)
         db.commit()
 
+    # DE-6 — Sales Assistant conversation persistence (additive only; no backfill).
+    inspector = inspect(db.bind)
+    tables = inspector.get_table_names()
+    if "assistant_conversations" not in tables:
+        from database import AssistantConversation
+
+        AssistantConversation.__table__.create(bind=db.bind, checkfirst=True)
+        db.commit()
+
+    inspector = inspect(db.bind)
+    tables = inspector.get_table_names()
+    if "assistant_messages" not in tables:
+        from database import AssistantMessage
+
+        AssistantMessage.__table__.create(bind=db.bind, checkfirst=True)
+        db.commit()
+
 
 def seed_user_defaults(db: Session, user_id: int, account_type: str = ACCOUNT_TYPE_COMPANY) -> None:
     categories = (

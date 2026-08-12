@@ -26,6 +26,24 @@ services:
       timeout: 5s
       retries: 12
 
+  # DE-6.5 — optional Redis for assistant working memory.
+  # Not started by default (profile). Backend does not depend_on redis.
+  # Enable later with: docker compose --profile assistant-memory up -d
+  # Keep ASSISTANT_MEMORY_ENABLED=false until intentionally enabled.
+  redis:
+    profiles: ["assistant-memory"]
+    image: redis:7-alpine
+    container_name: behtech_crm_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - behtech_crm_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend

@@ -6,6 +6,28 @@ import json
 
 from ai.capabilities.chat import run_sales_chat
 from ai.capabilities.chat_stream import iter_sales_chat_events
+from ai.assistant_memory import (
+    best_effort_memory_append,
+    best_effort_memory_clear,
+    best_effort_memory_sync_from_postgres,
+    merge_working_memory_with_postgres,
+)
+from ai.conversation_context import (
+    build_conversation_history_for_llm,
+    resolve_owned_conversation,
+)
+from ai.conversations_store import (
+    ROLE_USER,
+    append_message,
+    archive_conversation,
+    conversation_to_dict,
+    create_conversation,
+    get_conversation_for_org,
+    list_conversations_for_org,
+    list_messages_for_conversation,
+    message_to_dict,
+    update_conversation_title,
+)
 from ai.capabilities.diagnosis_interpreter import (
     DiagnosisInterpretDisabledError,
     DiagnosisNotFoundError,
@@ -55,6 +77,12 @@ from schemas import (
     AiStatusResponse,
     AiChatRequest,
     AiChatResponse,
+    AssistantConversationCreateRequest,
+    AssistantConversationDetailResponse,
+    AssistantConversationItem,
+    AssistantConversationListResponse,
+    AssistantConversationUpdateRequest,
+    AssistantMessageItem,
     PrioritiesRequest,
     PrioritiesResponse,
     PriorityRecommendationItem,
@@ -629,7 +657,52 @@ def ai_chat(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI yapılandırılmıyor")
 
     db, user, org_id = ctx
+    conversation = None
+    # Without conversation_id: preserve request-body history contract (max 8).
     history = [{"role": h.role, "content": h.content} for h in body.history]
+
+    if body.conversation_id is not None:
+        conversation = resolve_owned_conversation(
+            db,
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=body.conversation_id,
+            include_archived=False,
+        )
+        if conversation is None:
+            # Avoid leaking whether the id exists in another org.
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet bulunamadı")
+        # Persist user message before LLM call; assistant only on success.
+        user_msg = append_message(
+            db,
+            conversation=conversation,
+            user_id=user.id,
+            role=ROLE_USER,
+            content=body.message,
+            auto_title_if_empty=True,
+        )
+        db.commit()
+        # DE-6.3-A + DE-6.5: PG authoritative history; Redis working memory optional.
+        pg_history = build_conversation_history_for_llm(
+            db,
+            organization_id=org_id,
+            conversation_id=conversation.id,
+            exclude_message_id=user_msg.id,
+        )
+        history, _mem_src = merge_working_memory_with_postgres(
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            postgres_history=pg_history,
+        )
+        best_effort_memory_append(
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role=ROLE_USER,
+            content=body.message,
+        )
+
     try:
         reply, run_id = run_sales_chat(
             db,
@@ -638,6 +711,7 @@ def ai_chat(
             message=body.message,
             history=history,
             locale=body.locale or "tr",
+            conversation=conversation,
         )
     except ValueError as exc:
         if str(exc) == "empty_message":
@@ -648,10 +722,20 @@ def ai_chat(
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Yanıt oluşturulamadı") from exc
 
+    if conversation is not None:
+        best_effort_memory_append(
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role="assistant",
+            content=reply,
+        )
+
     return AiChatResponse(
         reply=reply,
         run_id=run_id,
         disclaimer="AI yanıtı — kritik kararlar için CRM kayıtlarını doğrulayın.",
+        conversation_id=conversation.id if conversation is not None else None,
     )
 
 
@@ -670,9 +754,49 @@ def ai_chat_stream(
 
     db, user, org_id = ctx
     history = [{"role": h.role, "content": h.content} for h in body.history]
+    conversation = None
 
     if not (body.message or "").strip():
         raise HTTPException(status_code=422, detail="Mesaj boş olamaz")
+
+    if body.conversation_id is not None:
+        conversation = resolve_owned_conversation(
+            db,
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=body.conversation_id,
+            include_archived=False,
+        )
+        if conversation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet bulunamadı")
+        user_msg = append_message(
+            db,
+            conversation=conversation,
+            user_id=user.id,
+            role=ROLE_USER,
+            content=body.message,
+            auto_title_if_empty=True,
+        )
+        db.commit()
+        pg_history = build_conversation_history_for_llm(
+            db,
+            organization_id=org_id,
+            conversation_id=conversation.id,
+            exclude_message_id=user_msg.id,
+        )
+        history, _mem_src = merge_working_memory_with_postgres(
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            postgres_history=pg_history,
+        )
+        best_effort_memory_append(
+            organization_id=org_id,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role=ROLE_USER,
+            content=body.message,
+        )
 
     def event_stream():
         try:
@@ -683,17 +807,36 @@ def ai_chat_stream(
                 message=body.message,
                 history=history,
                 locale=body.locale or "tr",
+                conversation=conversation,
             ):
                 if event.get("type") == "error" and event.get("detail") == "empty_message":
                     yield _sse_line({"type": "error", "detail": "Mesaj boş olamaz"})
                     return
                 if event.get("type") == "done":
-                    yield _sse_line(
-                        {
-                            **event,
-                            "disclaimer": "AI yanıtı — kritik kararlar için CRM kayıtlarını doğrulayın.",
-                        }
-                    )
+                    # Best-effort Redis update after successful stream (reply already in PG).
+                    if conversation is not None:
+                        try:
+                            # Reload PG turns and sync Redis from authoritative history.
+                            live_hist = build_conversation_history_for_llm(
+                                db,
+                                organization_id=org_id,
+                                conversation_id=conversation.id,
+                            )
+                            best_effort_memory_sync_from_postgres(
+                                organization_id=org_id,
+                                user_id=user.id,
+                                conversation_id=conversation.id,
+                                messages=live_hist,
+                            )
+                        except Exception:
+                            pass
+                    payload = {
+                        **event,
+                        "disclaimer": "AI yanıtı — kritik kararlar için CRM kayıtlarını doğrulayın.",
+                    }
+                    if conversation is not None and "conversation_id" not in payload:
+                        payload["conversation_id"] = conversation.id
+                    yield _sse_line(payload)
                 else:
                     yield _sse_line(event)
         except AiNotConfiguredError as exc:
@@ -710,3 +853,106 @@ def ai_chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/conversations", response_model=AssistantConversationListResponse)
+def list_assistant_conversations(
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    """DE-6 — list non-archived conversations for the caller's organization."""
+    db, user, org_id = ctx
+    rows = list_conversations_for_org(db, organization_id=org_id, user_id=user.id)
+    return AssistantConversationListResponse(
+        items=[AssistantConversationItem(**conversation_to_dict(r)) for r in rows]
+    )
+
+
+@router.post("/conversations", response_model=AssistantConversationItem)
+def create_assistant_conversation(
+    body: AssistantConversationCreateRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    db, user, org_id = ctx
+    row = create_conversation(
+        db,
+        organization_id=org_id,
+        user_id=user.id,
+        title=body.title,
+    )
+    db.commit()
+    db.refresh(row)
+    return AssistantConversationItem(**conversation_to_dict(row))
+
+
+@router.get("/conversations/{conversation_id}", response_model=AssistantConversationDetailResponse)
+def get_assistant_conversation(
+    conversation_id: int,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    db, user, org_id = ctx
+    conv = get_conversation_for_org(
+        db,
+        organization_id=org_id,
+        conversation_id=conversation_id,
+        include_archived=False,
+    )
+    if conv is None or conv.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet bulunamadı")
+    messages = list_messages_for_conversation(
+        db,
+        organization_id=org_id,
+        conversation_id=conv.id,
+    )
+    return AssistantConversationDetailResponse(
+        conversation=AssistantConversationItem(**conversation_to_dict(conv)),
+        messages=[AssistantMessageItem(**message_to_dict(m)) for m in messages],
+    )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=AssistantConversationItem)
+def patch_assistant_conversation(
+    conversation_id: int,
+    body: AssistantConversationUpdateRequest,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    db, user, org_id = ctx
+    conv = get_conversation_for_org(
+        db,
+        organization_id=org_id,
+        conversation_id=conversation_id,
+        include_archived=False,
+    )
+    if conv is None or conv.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet bulunamadı")
+    if body.title is not None:
+        update_conversation_title(db, conv, title=body.title)
+    db.commit()
+    db.refresh(conv)
+    return AssistantConversationItem(**conversation_to_dict(conv))
+
+
+@router.delete("/conversations/{conversation_id}", response_model=AssistantConversationItem)
+def delete_assistant_conversation(
+    conversation_id: int,
+    ctx: tuple[Session, object, int] = Depends(get_ai_context),
+):
+    """Soft-archive conversation (sets archived_at)."""
+    db, user, org_id = ctx
+    conv = get_conversation_for_org(
+        db,
+        organization_id=org_id,
+        conversation_id=conversation_id,
+        include_archived=False,
+    )
+    if conv is None or conv.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet bulunamadı")
+    archive_conversation(db, conv)
+    db.commit()
+    db.refresh(conv)
+    # Best-effort Redis cleanup — never roll back PG archive.
+    best_effort_memory_clear(
+        organization_id=org_id,
+        user_id=user.id,
+        conversation_id=conv.id,
+    )
+    return AssistantConversationItem(**conversation_to_dict(conv))

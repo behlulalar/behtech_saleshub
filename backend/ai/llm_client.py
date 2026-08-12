@@ -113,6 +113,53 @@ def chat_completion_messages(*, messages: list[dict]) -> tuple[str, dict]:
     return choice, usage
 
 
+def chat_completion_messages_with_tools(
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    tool_choice: str | dict = "auto",
+    temperature: float = 0.3,
+) -> tuple[dict, dict]:
+    """
+    Non-streaming chat completion that may return tool_calls.
+    Returns (assistant_message_dict, usage).
+    assistant_message_dict keys: role, content, tool_calls (optional list of dicts).
+    """
+    assert_llm_configured()
+    _provider, model = provider_and_model()
+    client = _openai_client()
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=tools,
+        tool_choice=tool_choice,
+        max_tokens=settings.ai_max_output_tokens,
+        temperature=temperature,
+    )
+    msg = response.choices[0].message
+    tool_calls_out: list[dict] = []
+    raw_calls = getattr(msg, "tool_calls", None) or []
+    for tc in raw_calls:
+        fn = getattr(tc, "function", None)
+        tool_calls_out.append(
+            {
+                "id": getattr(tc, "id", "") or "",
+                "type": "function",
+                "function": {
+                    "name": getattr(fn, "name", "") if fn else "",
+                    "arguments": getattr(fn, "arguments", "") if fn else "{}",
+                },
+            }
+        )
+    assistant_message: dict = {
+        "role": "assistant",
+        "content": msg.content,
+    }
+    if tool_calls_out:
+        assistant_message["tool_calls"] = tool_calls_out
+    return assistant_message, _usage_from_response(response)
+
+
 def _openai_client():
     timeout = settings.ai_llm_timeout_sec
     http_client = httpx.Client(timeout=timeout)

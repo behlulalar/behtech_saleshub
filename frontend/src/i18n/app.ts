@@ -448,14 +448,49 @@ export interface AppCopy {
   chat: {
     title: string;
     subtitle: string;
+    pageTitle: string;
+    pageSubtitle: string;
     open: string;
     close: string;
     placeholder: string;
+    composerPlaceholder: string;
+    composerLabel: string;
     send: string;
     sendFailed: string;
     thinking: string;
     emptyHint: string;
     disclaimer: string;
+    newChat: string;
+    loadFailed: string;
+    loadingHistory: string;
+    untitled: string;
+    toolWorking: string;
+    searchChats: string;
+    pastChats: string;
+    groupToday: string;
+    groupYesterday: string;
+    groupLast7: string;
+    groupOlder: string;
+    listFailed: string;
+    historyFailed: string;
+    archiveChat: string;
+    archiveFailed: string;
+    retry: string;
+    noConversations: string;
+    openSidebar: string;
+    closeSidebar: string;
+    unavailableTitle: string;
+    unavailableBody: string;
+    suggestionOffer: string;
+    suggestionFollowups: string;
+    suggestionSales: string;
+    suggestionRisk: string;
+    suggestionToday: string;
+    suggestionCritical: string;
+    suggestionPendingOffers: string;
+    emptySuggestion1: string;
+    emptySuggestion2: string;
+    emptySuggestion3: string;
   };
   leadImport: {
     title: string;
@@ -757,7 +792,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         },
         'intel-assistant': {
           title: 'Intelligence · Asistan',
-          description: 'Toplu skor güncelleme ve satış asistanı',
+          description: 'CRM odaklı satış asistanı sohbet alanı',
         },
       },
     },
@@ -1138,14 +1173,50 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
     chat: {
       title: 'Satış asistanı',
       subtitle: 'KPI ve lead özetine dayalı — salt okunur',
+      pageTitle: 'Satış Asistanı',
+      pageSubtitle:
+        'CRM verilerinizi sorun, analiz edin ve takip etmeniz gereken fırsatları bulun.',
       open: 'Asistanı aç',
       close: 'Kapat',
       placeholder: 'Sorunuzu yazın… (Enter gönderir)',
+      composerPlaceholder: 'CRM hakkında bir şey sorun...',
+      composerLabel: 'Asistan mesajı',
       send: 'Gönder',
-      sendFailed: 'Yanıt alınamadı',
+      sendFailed: 'Asistan şu anda yanıt veremiyor.',
       thinking: 'Düşünüyor…',
       emptyHint: 'Örn: “Bu hafta hangi lead’lere öncelik vermeliyim?” veya “Cevap bekleyenler ne durumda?”',
       disclaimer: 'AI yanıtı bilgilendirme amaçlıdır; kayıtları panelden doğrulayın.',
+      newChat: 'Yeni Sohbet',
+      loadFailed: 'Sohbet geçmişi yüklenemedi',
+      loadingHistory: 'Geçmiş yükleniyor…',
+      untitled: 'Yeni sohbet',
+      toolWorking: 'CRM inceleniyor…',
+      searchChats: 'Sohbet ara',
+      pastChats: 'Geçmiş sohbetler',
+      groupToday: 'Bugün',
+      groupYesterday: 'Dün',
+      groupLast7: 'Son 7 gün',
+      groupOlder: 'Daha eski',
+      listFailed: 'Konuşmalar yüklenemedi.',
+      historyFailed: 'Bu sohbet yüklenemedi.',
+      archiveChat: 'Sohbeti arşivle',
+      archiveFailed: 'Sohbet arşivlenemedi.',
+      retry: 'Tekrar dene',
+      noConversations: 'Henüz sohbet yok.',
+      openSidebar: 'Sohbet listesini aç',
+      closeSidebar: 'Sohbet listesini kapat',
+      unavailableTitle: 'Asistan şu an kullanılamıyor',
+      unavailableBody: 'AI sohbet bu hesap için aktif değil veya yapılandırılmamış.',
+      suggestionOffer: "Roof Tattoo'ya ne teklif vermiştik?",
+      suggestionFollowups: 'Bugün takip etmem gereken leadler hangileri?',
+      suggestionSales: 'Bu ay satışlar nasıl?',
+      suggestionRisk: 'En riskli leadler hangileri?',
+      suggestionToday: 'Bugün ne yapmalıyım?',
+      suggestionCritical: 'En kritik leadler hangileri?',
+      suggestionPendingOffers: 'Bekleyen teklifler neler?',
+      emptySuggestion1: 'Bugün ne yapmalıyım?',
+      emptySuggestion2: 'En kritik leadler hangileri?',
+      emptySuggestion3: 'Bekleyen teklifler neler?',
     },
     leadImport: {
       title: 'Excel ile Toplu Ekle',
@@ -1460,7 +1531,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
         },
         'intel-assistant': {
           title: 'Intelligence · Assistant',
-          description: 'Batch score refresh and sales assistant',
+          description: 'CRM-focused sales assistant chat workspace',
         },
       },
     },
@@ -1839,14 +1910,49 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
     chat: {
       title: 'Sales assistant',
       subtitle: 'Based on KPI & lead snapshot — read-only',
+      pageTitle: 'Sales Assistant',
+      pageSubtitle: 'Ask about your CRM data, analyze it, and find opportunities to follow up.',
       open: 'Open assistant',
       close: 'Close',
       placeholder: 'Type your question… (Enter to send)',
+      composerPlaceholder: 'Ask something about your CRM...',
+      composerLabel: 'Assistant message',
       send: 'Send',
-      sendFailed: 'Could not get a reply',
+      sendFailed: 'The assistant cannot reply right now.',
       thinking: 'Thinking…',
       emptyHint: 'e.g. “Which leads should I prioritize this week?”',
       disclaimer: 'AI replies are informational; verify records in the app.',
+      newChat: 'New chat',
+      loadFailed: 'Could not load chat history',
+      loadingHistory: 'Loading history…',
+      untitled: 'New chat',
+      toolWorking: 'Checking CRM…',
+      searchChats: 'Search chats',
+      pastChats: 'Past chats',
+      groupToday: 'Today',
+      groupYesterday: 'Yesterday',
+      groupLast7: 'Last 7 days',
+      groupOlder: 'Older',
+      listFailed: 'Could not load conversations.',
+      historyFailed: 'Could not load this chat.',
+      archiveChat: 'Archive chat',
+      archiveFailed: 'Could not archive chat.',
+      retry: 'Try again',
+      noConversations: 'No chats yet.',
+      openSidebar: 'Open chat list',
+      closeSidebar: 'Close chat list',
+      unavailableTitle: 'Assistant unavailable',
+      unavailableBody: 'AI chat is not enabled or configured for this account.',
+      suggestionOffer: 'What offer did we send to Roof Tattoo?',
+      suggestionFollowups: 'Which leads should I follow up today?',
+      suggestionSales: 'How are sales this month?',
+      suggestionRisk: 'Which leads are most at risk?',
+      suggestionToday: 'What should I do today?',
+      suggestionCritical: 'Which leads are most critical?',
+      suggestionPendingOffers: 'Which offers are still pending?',
+      emptySuggestion1: 'What should I do today?',
+      emptySuggestion2: 'Which leads are most critical?',
+      emptySuggestion3: 'Which offers are still pending?',
     },
     leadImport: {
       title: 'Bulk Import from Excel',

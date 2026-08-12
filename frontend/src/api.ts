@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, AssistantConversation, AssistantConversationDetailResponse, AssistantConversationListResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setIdleTimeoutMinutes, setRememberPreference, setToken } from './auth';
 
 const API_BASE = '/api';
@@ -761,9 +761,39 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  listAssistantConversations: () =>
+    request<AssistantConversationListResponse>('/ai/conversations'),
+
+  createAssistantConversation: (body?: { title?: string }) =>
+    request<AssistantConversation>('/ai/conversations', {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
+  getAssistantConversation: (conversationId: number) =>
+    request<AssistantConversationDetailResponse>(
+      `/ai/conversations/${encodeURIComponent(String(conversationId))}`,
+    ),
+
+  updateAssistantConversation: (conversationId: number, body: { title?: string }) =>
+    request<AssistantConversation>(
+      `/ai/conversations/${encodeURIComponent(String(conversationId))}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  archiveAssistantConversation: (conversationId: number) =>
+    request<AssistantConversation>(
+      `/ai/conversations/${encodeURIComponent(String(conversationId))}`,
+      { method: 'DELETE' },
+    ),
+
   streamAiChat: async (
     body: AiChatRequest,
     onDelta: (chunk: string) => void,
+    onToolStatus?: (status: string | null) => void,
   ): Promise<AiChatResponse> => {
     const token = getToken();
     const res = await fetch(`${API_BASE}/ai/chat/stream`, {
@@ -799,6 +829,7 @@ export const api = {
     let reply = '';
     let run_id = 0;
     let disclaimer = '';
+    let conversation_id: number | null = body.conversation_id ?? null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -816,14 +847,27 @@ export const api = {
             run_id?: number;
             disclaimer?: string;
             detail?: string;
+            conversation_id?: number;
+            status?: string;
+            tool?: string;
           };
-          if (payload.type === 'delta' && payload.content) {
+          if (payload.type === 'tool_start') {
+            onToolStatus?.(payload.status || payload.tool || null);
+          } else if (payload.type === 'tool_done') {
+            onToolStatus?.(payload.status || null);
+          } else if (payload.type === 'delta' && payload.content) {
+            onToolStatus?.(null);
             reply += payload.content;
             onDelta(payload.content);
           } else if (payload.type === 'done') {
+            onToolStatus?.(null);
             run_id = payload.run_id ?? 0;
             disclaimer = payload.disclaimer ?? '';
+            if (payload.conversation_id != null) {
+              conversation_id = payload.conversation_id;
+            }
           } else if (payload.type === 'error') {
+            onToolStatus?.(null);
             throw new Error(payload.detail || 'Yanıt alınamadı');
           }
         }
@@ -831,7 +875,7 @@ export const api = {
       }
     }
 
-    return { reply, run_id, disclaimer };
+    return { reply, run_id, disclaimer, conversation_id };
   },
 };
 

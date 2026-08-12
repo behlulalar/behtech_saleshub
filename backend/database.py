@@ -509,6 +509,48 @@ class DiagnosisSnapshot(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AssistantConversation(Base):
+    """DE-6 — org-scoped Sales Assistant conversation (soft-archive)."""
+
+    __tablename__ = "assistant_conversations"
+    __table_args__ = (
+        Index("ix_assistant_conversations_org_updated", "organization_id", "updated_at"),
+        Index("ix_assistant_conversations_org_user", "organization_id", "user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    archived_at = Column(DateTime, nullable=True)
+
+
+class AssistantMessage(Base):
+    """DE-6 — append-only Sales Assistant messages."""
+
+    __tablename__ = "assistant_messages"
+    __table_args__ = (
+        Index("ix_assistant_messages_conv_created", "conversation_id", "created_at"),
+        Index("ix_assistant_messages_org_created", "organization_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(
+        Integer,
+        ForeignKey("assistant_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    organization_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    run_id = Column(Integer, ForeignKey("ai_runs.id", ondelete="SET NULL"), nullable=True)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     from migrate_auth import run_migrations, seed_admin_user
