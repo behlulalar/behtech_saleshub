@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setIdleTimeoutMinutes, setRememberPreference, setToken } from './auth';
 
 const API_BASE = '/api';
@@ -709,6 +709,29 @@ export const api = {
   listDiagnoses: (period = 'monthly') =>
     request<DiagnosisListResponse>(`/intelligence/diagnoses?period=${period}`),
 
+  getDiagnosisHistory: (
+    diagnosisId: string,
+    opts?: { periodKey?: string; page?: number; limit?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.periodKey) params.set('period_key', opts.periodKey);
+    if (opts?.page != null) params.set('page', String(opts.page));
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    const qs = params.toString();
+    return requestWithStatus<DiagnosisHistoryResponse>(
+      `/intelligence/diagnoses/${encodeURIComponent(diagnosisId)}/history${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  syncDiagnoses: (body?: { period?: string; date?: string | null }) =>
+    request<DiagnosisSyncResponse>('/intelligence/diagnoses/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        period: body?.period ?? 'monthly',
+        ...(body?.date ? { date: body.date } : {}),
+      }),
+    }),
+
   interpretDiagnosis: (body: DiagnosisInterpretRequest) =>
     requestWithStatus<DiagnosisInterpretResponse>('/ai/diagnosis/interpret', {
       method: 'POST',
@@ -716,6 +739,17 @@ export const api = {
         diagnosis_id: body.diagnosis_id,
         period: body.period,
         date: body.date ?? null,
+        locale: body.locale ?? 'tr',
+        refresh: body.refresh ?? false,
+      }),
+    }),
+
+  interpretDiagnosisHistory: (body: DiagnosisHistoryInterpretRequest) =>
+    requestWithStatus<DiagnosisHistoryInterpretResponse>('/ai/diagnosis/history/interpret', {
+      method: 'POST',
+      body: JSON.stringify({
+        diagnosis_id: body.diagnosis_id,
+        period_key: body.period_key ?? null,
         locale: body.locale ?? 'tr',
         refresh: body.refresh ?? false,
       }),

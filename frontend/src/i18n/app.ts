@@ -354,6 +354,80 @@ export interface AppCopy {
     daysSuffix: string;
     offerAgeSuffix: string;
     diagnosisModifierSuffix: string;
+    viewDetails: string;
+    history: string;
+    firstSeen: string;
+    lastUpdated: string;
+    affectedLeads: string;
+    currentValue: string;
+    previousValue: string;
+    change: string;
+    syncButton: string;
+    syncing: string;
+    syncSuccess: string;
+    syncFailed: string;
+    historyNotFound: string;
+    historyEmpty: string;
+    historyLoadFailed: string;
+    diagnosisStatus: string;
+    metricSection: string;
+    timeline: string;
+    vsPreviousObservation: string;
+    durationLabel: string;
+    durationDays: string;
+    resolvedAt: string;
+    noLongerActive: string;
+    loadMoreHistory: string;
+    closeDetails: string;
+    triggerSync: string;
+    triggerResolve: string;
+    stateNew: string;
+    stateActive: string;
+    stateImproving: string;
+    stateWorsening: string;
+    stateResolved: string;
+    metricDaysSinceLastContact: string;
+    metricPendingOfferAge: string;
+    metricDemoToOffer: string;
+    metricOfferToWon: string;
+    placeholderDash: string;
+    trendSection: string;
+    trendDirectionNewlyDetected: string;
+    trendDirectionWorsening: string;
+    trendDirectionImproving: string;
+    trendDirectionStable: string;
+    trendDirectionResolved: string;
+    trendDirectionReopened: string;
+    trendLastChange: string;
+    trendReasons: string;
+    trendActiveDays: string;
+    trendReopenCount: string;
+    trendWorstPoint: string;
+    trendChangeSeverity: string;
+    trendChangeMetric: string;
+    trendChangeAffected: string;
+    trendChangeHighPriority: string;
+    reasonSeverityIncreased: string;
+    reasonSeverityDecreased: string;
+    reasonMetricWorsened: string;
+    reasonMetricImproved: string;
+    reasonAffectedIncreased: string;
+    reasonAffectedDecreased: string;
+    reasonHighPriorityIncreased: string;
+    reasonHighPriorityDecreased: string;
+    reasonLeadSetIncreased: string;
+    reasonLeadSetDecreased: string;
+    trendNoChanges: string;
+    historyAiSection: string;
+    historyAiButton: string;
+    historyAiLoading: string;
+    historyAiCached: string;
+    historyAiFailed: string;
+    historyAiUnavailable: string;
+    historyAiDisclaimer: string;
+    historyAiWhatChanged: string;
+    historyAiWhyMatters: string;
+    historyAiKeyPoints: string;
   };
   companyIntel: {
     title: string;
@@ -967,6 +1041,81 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       daysSuffix: 'gün',
       offerAgeSuffix: 'teklif',
       diagnosisModifierSuffix: 'teşhis',
+      viewDetails: 'Detayları Gör',
+      history: 'Geçmiş',
+      firstSeen: 'İlk Görülme',
+      lastUpdated: 'Son Güncelleme',
+      affectedLeads: 'Etkilenen Lead',
+      currentValue: 'Mevcut Değer',
+      previousValue: 'Önceki Değer',
+      change: 'Değişim',
+      syncButton: 'Teşhisleri Güncelle',
+      syncing: 'Güncelleniyor',
+      syncSuccess: 'Teşhis geçmişi güncellendi.',
+      syncFailed: 'Teşhisler güncellenemedi.',
+      historyNotFound: 'Bu teşhis için geçmiş bulunamadı.',
+      historyEmpty: 'Bu teşhis için henüz geçmiş verisi bulunmuyor.',
+      historyLoadFailed: 'Geçmiş yüklenemedi.',
+      diagnosisStatus: 'Teşhis durumu',
+      metricSection: 'Metrik',
+      timeline: 'Geçmiş zaman çizelgesi',
+      vsPreviousObservation: 'Önceki gözleme göre',
+      durationLabel: 'Devam süresi',
+      durationDays: '{n} gün',
+      resolvedAt: 'Çözülme',
+      noLongerActive: 'Bu teşhis artık aktif değil.',
+      loadMoreHistory: 'Daha fazla',
+      closeDetails: 'Kapat',
+      triggerSync: 'Senkron',
+      triggerResolve: 'Çözüm',
+      stateNew: 'Yeni',
+      stateActive: 'Aktif',
+      stateImproving: 'İyileşiyor',
+      stateWorsening: 'Kötüleşiyor',
+      stateResolved: 'Çözüldü',
+      metricDaysSinceLastContact: 'Son iletişimden bu yana (gün)',
+      metricPendingOfferAge: 'Bekleyen teklif yaşı (gün)',
+      metricDemoToOffer: 'Demo → teklif dönüşümü',
+      metricOfferToWon: 'Teklif → kazanma dönüşümü',
+      placeholderDash: '—',
+      trendSection: 'Trend özeti',
+      trendDirectionNewlyDetected: 'İlk kez görüldü',
+      trendDirectionWorsening: 'Kötüleşiyor',
+      trendDirectionImproving: 'İyileşiyor',
+      trendDirectionStable: 'Stabil',
+      trendDirectionResolved: 'Çözüldü',
+      trendDirectionReopened: 'Tekrar ortaya çıktı',
+      trendLastChange: 'Son değişiklik',
+      trendReasons: 'Neden',
+      trendActiveDays: 'Aktif süre',
+      trendReopenCount: 'Tekrar açılma',
+      trendWorstPoint: 'En kötü nokta',
+      trendChangeSeverity: 'Önem: {from} → {to}',
+      trendChangeMetric: '{metric}: {from} → {to}',
+      trendChangeAffected: 'Etkilenen lead: {from} → {to}',
+      trendChangeHighPriority: 'Yüksek öncelik: {from} → {to}',
+      reasonSeverityIncreased: 'Önem seviyesi arttı',
+      reasonSeverityDecreased: 'Önem seviyesi azaldı',
+      reasonMetricWorsened: 'Temel metrik kötüleşti',
+      reasonMetricImproved: 'Temel metrik iyileşti',
+      reasonAffectedIncreased: 'Etkilenen lead sayısı arttı',
+      reasonAffectedDecreased: 'Etkilenen lead sayısı azaldı',
+      reasonHighPriorityIncreased: 'Yüksek öncelikli lead sayısı arttı',
+      reasonHighPriorityDecreased: 'Yüksek öncelikli lead sayısı azaldı',
+      reasonLeadSetIncreased: 'Etkilenen lead kümesi büyüdü',
+      reasonLeadSetDecreased: 'Etkilenen lead kümesi küçüldü',
+      trendNoChanges: 'Son gözlemde ölçülebilir değişiklik yok.',
+      historyAiSection: 'Geçmiş AI yorumu',
+      historyAiButton: 'Geçmişi AI ile Yorumla',
+      historyAiLoading: 'Geçmiş yorumlanıyor…',
+      historyAiCached: 'Önceki AI yorumu',
+      historyAiFailed: 'Geçmiş yorumu oluşturulamadı.',
+      historyAiUnavailable: 'Geçmiş AI yorumu şu an kullanılamıyor.',
+      historyAiDisclaimer:
+        'Bu yorum teşhisin geçmiş verilerine dayanır. Teşhis durumunu veya aksiyonları değiştirmez.',
+      historyAiWhatChanged: 'Ne değişti',
+      historyAiWhyMatters: 'Neden önemli',
+      historyAiKeyPoints: 'Öne çıkanlar',
     },
     companyIntel: {
       title: 'Şirket özeti (Intelligence)',
@@ -1595,6 +1744,81 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       daysSuffix: 'd',
       offerAgeSuffix: 'offer',
       diagnosisModifierSuffix: 'diagnosis',
+      viewDetails: 'View details',
+      history: 'History',
+      firstSeen: 'First seen',
+      lastUpdated: 'Last updated',
+      affectedLeads: 'Affected leads',
+      currentValue: 'Current value',
+      previousValue: 'Previous value',
+      change: 'Change',
+      syncButton: 'Update diagnoses',
+      syncing: 'Updating',
+      syncSuccess: 'Diagnosis history updated.',
+      syncFailed: 'Could not update diagnoses.',
+      historyNotFound: 'No history found for this diagnosis.',
+      historyEmpty: 'No history data for this diagnosis yet.',
+      historyLoadFailed: 'Could not load history.',
+      diagnosisStatus: 'Diagnosis status',
+      metricSection: 'Metric',
+      timeline: 'History timeline',
+      vsPreviousObservation: 'vs previous observation',
+      durationLabel: 'Duration',
+      durationDays: '{n} days',
+      resolvedAt: 'Resolved',
+      noLongerActive: 'This diagnosis is no longer active.',
+      loadMoreHistory: 'Load more',
+      closeDetails: 'Close',
+      triggerSync: 'Sync',
+      triggerResolve: 'Resolve',
+      stateNew: 'New',
+      stateActive: 'Active',
+      stateImproving: 'Improving',
+      stateWorsening: 'Worsening',
+      stateResolved: 'Resolved',
+      metricDaysSinceLastContact: 'Days since last contact',
+      metricPendingOfferAge: 'Pending offer age (days)',
+      metricDemoToOffer: 'Demo → offer conversion',
+      metricOfferToWon: 'Offer → won conversion',
+      placeholderDash: '—',
+      trendSection: 'Trend summary',
+      trendDirectionNewlyDetected: 'Newly detected',
+      trendDirectionWorsening: 'Worsening',
+      trendDirectionImproving: 'Improving',
+      trendDirectionStable: 'Stable',
+      trendDirectionResolved: 'Resolved',
+      trendDirectionReopened: 'Reopened',
+      trendLastChange: 'Latest change',
+      trendReasons: 'Why',
+      trendActiveDays: 'Active duration',
+      trendReopenCount: 'Reopen count',
+      trendWorstPoint: 'Worst point',
+      trendChangeSeverity: 'Severity: {from} → {to}',
+      trendChangeMetric: '{metric}: {from} → {to}',
+      trendChangeAffected: 'Affected leads: {from} → {to}',
+      trendChangeHighPriority: 'High priority: {from} → {to}',
+      reasonSeverityIncreased: 'Severity increased',
+      reasonSeverityDecreased: 'Severity decreased',
+      reasonMetricWorsened: 'Core metric worsened',
+      reasonMetricImproved: 'Core metric improved',
+      reasonAffectedIncreased: 'Affected lead count increased',
+      reasonAffectedDecreased: 'Affected lead count decreased',
+      reasonHighPriorityIncreased: 'High-priority lead count increased',
+      reasonHighPriorityDecreased: 'High-priority lead count decreased',
+      reasonLeadSetIncreased: 'Affected lead set grew',
+      reasonLeadSetDecreased: 'Affected lead set shrank',
+      trendNoChanges: 'No measurable change in the latest observation.',
+      historyAiSection: 'Historical AI interpretation',
+      historyAiButton: 'Interpret history with AI',
+      historyAiLoading: 'Interpreting history…',
+      historyAiCached: 'Previous AI interpretation',
+      historyAiFailed: 'Could not create historical interpretation.',
+      historyAiUnavailable: 'Historical AI interpretation is unavailable right now.',
+      historyAiDisclaimer:
+        'This interpretation is based on diagnosis history. It does not change diagnosis state or actions.',
+      historyAiWhatChanged: 'What changed',
+      historyAiWhyMatters: 'Why it matters',
+      historyAiKeyPoints: 'Highlights',
     },
     companyIntel: {
       title: 'Company snapshot (Intelligence)',

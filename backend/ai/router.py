@@ -11,16 +11,25 @@ from ai.capabilities.diagnosis_interpreter import (
     DiagnosisNotFoundError,
     run_diagnosis_interpret,
 )
+from ai.capabilities.diagnosis_history_interpreter import (
+    DiagnosisHistoryInterpretDisabledError,
+    DiagnosisHistoryNotFoundError,
+    DiagnosisHistoryPeriodError,
+    run_diagnosis_history_interpret,
+)
 from ai.capabilities.priorities import run_priorities
 from ai.capabilities.suggest_message import run_suggest_message
 from ai.capabilities.summarize_lead import run_summarize_lead
 from ai.deps import (
     ai_is_configured,
+    diagnosis_history_interpret_available,
     diagnosis_interpret_available,
     get_ai_context,
     require_ai_enabled,
     require_chat_enabled,
 )
+from database import User, get_db
+from roles import get_org_id, require_owner
 from ai.llm_client import AiNotConfiguredError, DiagnosisOpenAiRequiredError
 from ai.actions.propose_service import (
     ProposeValidationError,
@@ -38,7 +47,6 @@ from ai.store import create_queued_run, get_run_for_org, list_runs_for_org, run_
 from ai.run_worker import execute_run, process_pending_runs
 from ai.usage import usage_summary
 from config import settings
-from roles import require_owner
 from schemas import (
     AiRunCreateRequest,
     AiRunCreateResponse,
@@ -56,6 +64,8 @@ from schemas import (
     SummarizeLeadResponse,
     DiagnosisInterpretRequest,
     DiagnosisInterpretResponse,
+    DiagnosisHistoryInterpretRequest,
+    DiagnosisHistoryInterpretResponse,
     IntelligenceInsightItem,
     AiActionProposeRequest,
     AiActionFromRecommendationRequest,
@@ -79,6 +89,7 @@ def get_ai_status(
     token_ok = enabled and configured and usage["tokens_remaining"] > 0
     chat_ok = token_ok and settings.ai_chat_enabled
     de3_ok = diagnosis_interpret_available(db, org_id)
+    de51_ok = diagnosis_history_interpret_available(db, org_id)
     return AiStatusResponse(
         enabled=enabled,
         configured=configured,
@@ -95,6 +106,7 @@ def get_ai_status(
         daily_email_enabled=enabled and settings.ai_daily_email and configured,
         chat_available=chat_ok,
         diagnosis_interpret_available=de3_ok,
+        diagnosis_history_interpret_available=de51_ok,
     )
 
 
@@ -220,6 +232,52 @@ def diagnosis_interpret(
         raise HTTPException(status_code=502, detail="Teşhis yorumu oluşturulamadı") from exc
 
     return DiagnosisInterpretResponse(**result)
+
+
+@router.post(
+    "/diagnosis/history/interpret",
+    response_model=DiagnosisHistoryInterpretResponse,
+)
+def diagnosis_history_interpret(
+    body: DiagnosisHistoryInterpretRequest,
+    db: Session = Depends(get_db),
+    owner: User = Depends(require_owner),
+):
+    """
+    DE-5.1-C — historical diagnosis interpretation.
+    Owner-only. Read-only vs Case/Snapshot. No proposal bridge / AiAction.
+    """
+    require_ai_enabled()
+    org_id = get_org_id(owner)
+    try:
+        result = run_diagnosis_history_interpret(
+            db,
+            user=owner,
+            org_id=org_id,
+            diagnosis_id=body.diagnosis_id,
+            period_key=body.period_key,
+            locale=body.locale or "tr",
+            refresh=body.refresh,
+        )
+    except DiagnosisHistoryInterpretDisabledError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiagnosisHistoryPeriodError as exc:
+        detail = (
+            "Geçersiz period_key"
+            if exc.code == "invalid_period_key"
+            else "period_key gerekli"
+        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail) from exc
+    except DiagnosisHistoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teşhis bulunamadı") from exc
+    except DiagnosisOpenAiRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Teşhis geçmişi yorumu oluşturulamadı") from exc
+
+    return DiagnosisHistoryInterpretResponse(**result)
 
 
 def _propose_validation_to_http(exc: ProposeValidationError) -> HTTPException:

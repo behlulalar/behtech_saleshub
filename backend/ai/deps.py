@@ -13,6 +13,7 @@ from ai.usage import usage_summary
 __all__ = [
     "ai_is_configured",
     "diagnosis_interpret_available",
+    "diagnosis_history_interpret_available",
     "require_ai_enabled",
     "get_org_user",
     "get_ai_context",
@@ -23,6 +24,17 @@ def diagnosis_interpret_available(db, org_id: int) -> bool:
     if not settings.ai_enabled:
         return False
     if not settings.diagnosis_engine_enabled or not settings.ai_diagnosis_interpret_enabled:
+        return False
+    if not diagnosis_openai_available():
+        return False
+    usage = usage_summary(db, org_id)
+    return usage["tokens_remaining"] > 0
+
+
+def diagnosis_history_interpret_available(db, org_id: int) -> bool:
+    if not settings.ai_enabled:
+        return False
+    if not settings.diagnosis_engine_enabled or not settings.ai_diagnosis_history_interpret_enabled:
         return False
     if not diagnosis_openai_available():
         return False

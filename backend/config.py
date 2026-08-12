@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     ai_diagnosis_interpret_temperature: float = 0.2
     ai_diagnosis_interpret_estimated_tokens: int = 1200
     ai_de4_interpret_proposal_bridge_enabled: bool = False
+    # DE-5.1-C: Historical diagnosis interpretation (POST /api/ai/diagnosis/history/interpret)
+    ai_diagnosis_history_interpret_enabled: bool = False
+    ai_diagnosis_history_interpret_cache_ttl_hours: int = 48
+    ai_diagnosis_history_interpret_estimated_tokens: int = 1400
 
     model_config = SettingsConfigDict(env_file=".env")
 

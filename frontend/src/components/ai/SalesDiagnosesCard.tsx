@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, ChevronRight, Loader2, Sparkles, Stethoscope } from 'lucide-react';
+import { Activity, ChevronRight, Loader2, RefreshCw, Sparkles, Stethoscope } from 'lucide-react';
 import { ApiHttpError, api } from '../../api';
 import { useLocale } from '../../i18n/locale';
+import { formatAppDateTime } from '../../utils';
 import type { DiagnosisItem, DiagnosisInterpretResponse, DiagnosisPriorityLead } from '../../types';
 import DiagnosisBridgeActionsPanel from './DiagnosisBridgeActionsPanel';
+import DiagnosisDetailModal from './DiagnosisDetailModal';
+import {
+  type CaseSummary,
+  lifecycleStateClass,
+  lifecycleStateLabel,
+} from './diagnosisHistoryUi';
 import { uniqueActionIds } from './de4ActionDedup';
 import { aiPriorityBadgeClass, aiPriorityLabel } from './aiPriorityUi';
 import {
@@ -314,6 +321,11 @@ export default function SalesDiagnosesCard({ onEditLead, onDe4ActionChanged }: P
   const [interpretAvailability, setInterpretAvailability] = useState<InterpretAvailability>('loading');
   const [interpretById, setInterpretById] = useState<Record<string, InterpretUiState>>({});
   const inFlightRef = useRef<Set<string>>(new Set());
+  const [detailDiagnosis, setDetailDiagnosis] = useState<DiagnosisItem | null>(null);
+  const [caseSummaryById, setCaseSummaryById] = useState<Record<string, CaseSummary>>({});
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -334,6 +346,27 @@ export default function SalesDiagnosesCard({ onEditLead, onDe4ActionChanged }: P
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleSync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncMessage(null);
+    setSyncError(null);
+    try {
+      await api.syncDiagnoses({ period: 'monthly' });
+      setCaseSummaryById({});
+      await load();
+      setSyncMessage(cardCopy.syncSuccess);
+    } catch {
+      setSyncError(cardCopy.syncFailed);
+    } finally {
+      setSyncing(false);
+    }
+  }, [cardCopy.syncFailed, cardCopy.syncSuccess, load, syncing]);
+
+  const handleCaseSummary = useCallback((diagnosisId: string, summary: CaseSummary) => {
+    setCaseSummaryById((prev) => ({ ...prev, [diagnosisId]: summary }));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -429,18 +462,39 @@ export default function SalesDiagnosesCard({ onEditLead, onDe4ActionChanged }: P
 
   return (
     <section className="card overflow-hidden border-surface-200">
-      <div className="flex items-start gap-3 border-b border-surface-100 bg-surface-50/50 px-4 py-3.5 sm:px-5 sm:py-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-          <Stethoscope size={20} />
+      <div className="flex flex-col gap-3 border-b border-surface-100 bg-surface-50/50 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+            <Stethoscope size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-surface-900 sm:text-base">{cardCopy.title}</h3>
+            <p className="mt-1 text-xs text-surface-800/60 sm:text-sm">{cardCopy.subtitle}</p>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-surface-900 sm:text-base">{cardCopy.title}</h3>
-          <p className="mt-1 text-xs text-surface-800/60 sm:text-sm">{cardCopy.subtitle}</p>
+        <div className="flex items-center gap-2 self-stretch sm:self-start">
+          {loading ? <Loader2 size={18} className="animate-spin text-surface-400" aria-hidden /> : null}
+          <button
+            type="button"
+            disabled={syncing || loading}
+            onClick={() => void handleSync()}
+            className="btn-secondary inline-flex w-full items-center justify-center gap-2 py-2 text-sm sm:w-auto"
+          >
+            {syncing ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw size={16} aria-hidden />
+            )}
+            {syncing ? cardCopy.syncing : cardCopy.syncButton}
+          </button>
         </div>
-        {loading ? <Loader2 size={18} className="animate-spin text-surface-400" aria-hidden /> : null}
       </div>
 
       {error ? <p className="px-4 py-3 text-sm text-rose-600 sm:px-5">{error}</p> : null}
+      {syncError ? <p className="px-4 py-2 text-sm text-rose-600 sm:px-5">{syncError}</p> : null}
+      {syncMessage ? (
+        <p className="px-4 py-2 text-sm text-emerald-700 sm:px-5">{syncMessage}</p>
+      ) : null}
 
       {!error && !loading && items.length === 0 ? (
         <p className="flex items-center gap-2 px-4 py-4 text-sm text-surface-800/55 sm:px-5">
@@ -451,67 +505,109 @@ export default function SalesDiagnosesCard({ onEditLead, onDe4ActionChanged }: P
 
       {items.length > 0 ? (
         <ul className="divide-y divide-surface-100">
-          {items.map((d) => (
-            <li key={d.diagnosis_id} className="px-4 py-3 sm:px-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase ${severityClass[d.severity] ?? severityClass.medium}`}
+          {items.map((d) => {
+            const summary = caseSummaryById[d.diagnosis_id];
+            return (
+              <li key={d.diagnosis_id} className="px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase ${severityClass[d.severity] ?? severityClass.medium}`}
+                  >
+                    {d.severity}
+                  </span>
+                  <span className="text-xs text-surface-500">{d.type}</span>
+                  {summary ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${lifecycleStateClass(summary.state)}`}
+                    >
+                      {lifecycleStateLabel(summary.state, cardCopy)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm font-medium text-surface-900">{d.title}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-surface-800/65">{d.description}</p>
+
+                {summary ? (
+                  <p className="mt-1.5 text-xs text-surface-600">
+                    {cardCopy.firstSeen}:{' '}
+                    {summary.first_seen_at
+                      ? formatAppDateTime(summary.first_seen_at, locale)
+                      : cardCopy.placeholderDash}
+                    {' · '}
+                    {cardCopy.lastUpdated}:{' '}
+                    {summary.last_seen_at
+                      ? formatAppDateTime(summary.last_seen_at, locale)
+                      : cardCopy.placeholderDash}
+                  </p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setDetailDiagnosis(d)}
+                  className="mt-2 text-xs font-medium text-violet-700 hover:text-violet-900"
                 >
-                  {d.severity}
-                </span>
-                <span className="text-xs text-surface-500">{d.type}</span>
-              </div>
-              <p className="mt-1 text-sm font-medium text-surface-900">{d.title}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-surface-800/65">{d.description}</p>
+                  {cardCopy.viewDetails}
+                </button>
 
-              {d.affected_leads_available === false ? (
-                <p className="mt-2 text-xs text-surface-600/70">{cardCopy.noLeadPriorityList}</p>
-              ) : null}
+                {d.affected_leads_available === false ? (
+                  <p className="mt-2 text-xs text-surface-600/70">{cardCopy.noLeadPriorityList}</p>
+                ) : null}
 
-              {d.impact && d.affected_leads_available !== false ? (
-                <p className="mt-2 text-xs text-surface-700">
-                  {cardCopy.impactDistribution}{' '}
-                  <span className="font-medium text-rose-700">
-                    {d.impact.high_priority_count} {cardCopy.impactHigh}
-                  </span>
-                  {', '}
-                  <span className="font-medium text-amber-800">
-                    {d.impact.medium_priority_count} {cardCopy.impactMedium}
-                  </span>
-                  {', '}
-                  <span>
-                    {d.impact.low_priority_count} {cardCopy.impactLow}
-                  </span>
-                </p>
-              ) : null}
+                {d.impact && d.affected_leads_available !== false ? (
+                  <p className="mt-2 text-xs text-surface-700">
+                    {cardCopy.impactDistribution}{' '}
+                    <span className="font-medium text-rose-700">
+                      {d.impact.high_priority_count} {cardCopy.impactHigh}
+                    </span>
+                    {', '}
+                    <span className="font-medium text-amber-800">
+                      {d.impact.medium_priority_count} {cardCopy.impactMedium}
+                    </span>
+                    {', '}
+                    <span>
+                      {d.impact.low_priority_count} {cardCopy.impactLow}
+                    </span>
+                  </p>
+                ) : null}
 
-              {d.top_priority_leads && d.top_priority_leads.length > 0 ? (
-                <ul className="mt-2 space-y-1.5">
-                  {d.top_priority_leads.map((row) => (
-                    <PriorityLeadRow
-                      key={row.lead_id}
-                      row={row}
-                      onEditLead={onEditLead}
-                      copy={cardCopy}
-                    />
-                  ))}
-                </ul>
-              ) : null}
+                {d.top_priority_leads && d.top_priority_leads.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {d.top_priority_leads.map((row) => (
+                      <PriorityLeadRow
+                        key={row.lead_id}
+                        row={row}
+                        onEditLead={onEditLead}
+                        copy={cardCopy}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
 
-              <DiagnosisInterpretSection
-                diagnosisId={d.diagnosis_id}
-                availability={interpretAvailability}
-                state={interpretById[d.diagnosis_id] ?? { phase: 'idle' }}
-                onRequest={requestInterpret}
-                onToggleExpand={toggleExpand}
-                labels={t}
-                priorityLabels={priorityLabels}
-                onOpenLead={onEditLead}
-                onDe4ActionChanged={onDe4ActionChanged}
-              />
-            </li>
-          ))}
+                <DiagnosisInterpretSection
+                  diagnosisId={d.diagnosis_id}
+                  availability={interpretAvailability}
+                  state={interpretById[d.diagnosis_id] ?? { phase: 'idle' }}
+                  onRequest={requestInterpret}
+                  onToggleExpand={toggleExpand}
+                  labels={t}
+                  priorityLabels={priorityLabels}
+                  onOpenLead={onEditLead}
+                  onDe4ActionChanged={onDe4ActionChanged}
+                />
+              </li>
+            );
+          })}
         </ul>
+      ) : null}
+
+      {detailDiagnosis ? (
+        <DiagnosisDetailModal
+          diagnosis={detailDiagnosis}
+          open
+          onClose={() => setDetailDiagnosis(null)}
+          onCaseSummary={handleCaseSummary}
+          onEditLead={onEditLead}
+        />
       ) : null}
     </section>
   );

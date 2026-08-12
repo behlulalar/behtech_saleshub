@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -431,6 +432,81 @@ class AiAction(Base):
     approved_at = Column(DateTime, nullable=True)
     executed_at = Column(DateTime, nullable=True)
     execution_result_json = Column(Text, nullable=True)
+
+
+class DiagnosisCase(Base):
+    """DE-5.0 — org-scoped current diagnosis identity + lifecycle state."""
+
+    __tablename__ = "diagnosis_cases"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "diagnosis_id",
+            "period_key",
+            name="uq_diagnosis_cases_org_diagnosis_period",
+        ),
+        Index("ix_diagnosis_cases_org_state", "organization_id", "state"),
+        Index("ix_diagnosis_cases_org_last_seen", "organization_id", "last_seen_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    diagnosis_id = Column(String(80), nullable=False)
+    diagnosis_type = Column(String(40), nullable=False)
+    period_key = Column(String(20), nullable=False)
+    state = Column(String(20), nullable=False, default="new")
+    severity = Column(String(20), nullable=False, default="medium")
+    title = Column(String(255), nullable=False, default="")
+    metric = Column(String(80), nullable=False, default="")
+    current_value = Column(Float, nullable=True)
+    engine_previous_value = Column(Float, nullable=True)
+    change_percent = Column(Float, nullable=True)
+    affected_lead_count = Column(Integer, nullable=False, default=0)
+    fingerprint = Column(String(64), nullable=False, default="")
+    first_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_synced_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    # Pointer only — no FK (avoids circular create with diagnosis_snapshots).
+    latest_snapshot_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DiagnosisSnapshot(Base):
+    """DE-5.0 — append-only diagnosis observation history."""
+
+    __tablename__ = "diagnosis_snapshots"
+    __table_args__ = (
+        Index("ix_diagnosis_snapshots_case_observed", "case_id", "observed_at"),
+        Index("ix_diagnosis_snapshots_org_observed", "organization_id", "observed_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    case_id = Column(
+        Integer,
+        ForeignKey("diagnosis_cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    diagnosis_id = Column(String(80), nullable=False)
+    period_key = Column(String(20), nullable=False)
+    anchor = Column(String(32), nullable=False, default="")
+    observed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    state = Column(String(20), nullable=False, default="new")
+    severity = Column(String(20), nullable=False, default="medium")
+    metric = Column(String(80), nullable=False, default="")
+    current_value = Column(Float, nullable=True)
+    engine_previous_value = Column(Float, nullable=True)
+    change_percent = Column(Float, nullable=True)
+    affected_lead_count = Column(Integer, nullable=False, default=0)
+    impact_json = Column(Text, nullable=False, default="{}")
+    top_leads_json = Column(Text, nullable=False, default="[]")
+    evidence_json = Column(Text, nullable=False, default="{}")
+    fingerprint = Column(String(64), nullable=False, default="")
+    trigger = Column(String(40), nullable=False, default="sync")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 def init_db():

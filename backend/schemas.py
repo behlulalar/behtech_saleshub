@@ -673,6 +673,7 @@ class AiStatusResponse(BaseModel):
     daily_email_enabled: bool = False
     chat_available: bool = False
     diagnosis_interpret_available: bool = False
+    diagnosis_history_interpret_available: bool = False
 
 
 class AiChatHistoryItem(BaseModel):
@@ -793,6 +794,142 @@ class DiagnosisListResponse(BaseModel):
     items: list[DiagnosisItem] = Field(default_factory=list)
 
 
+class DiagnosisSyncRequest(BaseModel):
+    period: str = Field(default="monthly", pattern="^(daily|weekly|monthly)$")
+    date: str | None = Field(
+        default=None,
+        max_length=32,
+        description="YYYY-MM-DD veya monthly için YYYY-MM (opsiyonel anchor)",
+    )
+
+
+class DiagnosisSyncResponse(BaseModel):
+    period: str
+    created_cases: int = 0
+    updated_cases: int = 0
+    new_snapshots: int = 0
+    resolved_cases: int = 0
+    reopened_cases: int = 0
+    unchanged_cases: int = 0
+    period_keys_in_scope: list[str] = Field(default_factory=list)
+    organization_id: int = 0
+
+
+class DiagnosisHistorySnapshotItem(BaseModel):
+    id: int
+    observed_at: str
+    state: str
+    severity: str
+    metric: str
+    current_value: float | None = None
+    engine_previous_value: float | None = None
+    change_percent: float | None = None
+    affected_lead_count: int = 0
+    impact: dict[str, Any] = Field(default_factory=dict)
+    top_leads: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    fingerprint: str = ""
+    trigger: str = ""
+    created_at: str = ""
+
+
+class DiagnosisTrendSnapshotRef(BaseModel):
+    """Public observation ref for trend (no fingerprint / evidence / DB ids)."""
+
+    observed_at: str = ""
+    state: str = ""
+    severity: str = ""
+    metric: str = ""
+    current_value: float | None = None
+    change_percent: float | None = None
+    affected_lead_count: int = 0
+    trigger: str = ""
+
+
+class DiagnosisTrendChanges(BaseModel):
+    severity_from: str | None = None
+    severity_to: str | None = None
+    severity_delta: int = 0
+    current_value_from: float | None = None
+    current_value_to: float | None = None
+    current_value_delta: float | None = None
+    metric_direction: int = 0
+    affected_lead_count_from: int = 0
+    affected_lead_count_to: int = 0
+    affected_lead_count_delta: int = 0
+    high_priority_count_from: int = 0
+    high_priority_count_to: int = 0
+    high_priority_count_delta: int = 0
+    medium_priority_count_from: int = 0
+    medium_priority_count_to: int = 0
+    medium_priority_count_delta: int = 0
+    low_priority_count_from: int = 0
+    low_priority_count_to: int = 0
+    low_priority_count_delta: int = 0
+    lead_set_added_count: int = 0
+    lead_set_removed_count: int = 0
+    lead_set_size_from: int = 0
+    lead_set_size_to: int = 0
+
+
+class DiagnosisTrendWorstPoint(BaseModel):
+    observed_at: str = ""
+    severity: str = ""
+    metric: str = ""
+    current_value: float | None = None
+    affected_lead_count: int = 0
+
+
+class DiagnosisTrendWindowMetrics(BaseModel):
+    n: int = 5
+    observation_count: int = 0
+    dominant_direction: str = "stable"
+    min_current_value: float | None = None
+    max_current_value: float | None = None
+    min_affected_lead_count: int | None = None
+    max_affected_lead_count: int | None = None
+    worst_severity: str | None = None
+
+
+class DiagnosisTrendMetrics(BaseModel):
+    active_duration_seconds: float | None = None
+    last_substantive_change_at: str | None = None
+    reopen_count: int = 0
+    substantive_count: int = 0
+    total_snapshot_count: int = 0
+    worst_point: DiagnosisTrendWorstPoint | None = None
+    window: DiagnosisTrendWindowMetrics = Field(default_factory=DiagnosisTrendWindowMetrics)
+
+
+class DiagnosisTrendSummary(BaseModel):
+    """DE-5.1 — deterministic trend (not DiagnosisCase.state)."""
+
+    direction: str = "stable"
+    reason_codes: list[str] = Field(default_factory=list)
+    changes: DiagnosisTrendChanges = Field(default_factory=DiagnosisTrendChanges)
+    previous_snapshot: DiagnosisTrendSnapshotRef | None = None
+    current_snapshot: DiagnosisTrendSnapshotRef | None = None
+    substantive_count: int = 0
+    metrics: DiagnosisTrendMetrics = Field(default_factory=DiagnosisTrendMetrics)
+
+
+class DiagnosisHistoryResponse(BaseModel):
+    diagnosis_id: str
+    diagnosis_type: str
+    period_key: str
+    state: str
+    first_seen_at: str | None = None
+    last_seen_at: str | None = None
+    last_synced_at: str | None = None
+    resolved_at: str | None = None
+    latest_snapshot_id: int | None = None
+    page: int = 1
+    limit: int = 20
+    total: int = 0
+    snapshots: list[DiagnosisHistorySnapshotItem] = Field(default_factory=list)
+    trend: DiagnosisTrendSummary | None = None
+
+
 class DiagnosisRecommendedAction(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     reason: str = Field(min_length=1, max_length=400)
@@ -833,6 +970,53 @@ class DiagnosisInterpretResponse(BaseModel):
     disclaimer: str = ""
     error_code: str | None = None
     proposal_bridge: dict[str, Any] | None = None
+
+
+class DiagnosisHistoryInterpretation(BaseModel):
+    """DE-5.1-C — historical narrative only (no recommended_actions)."""
+
+    summary: str = Field(min_length=1, max_length=800)
+    what_changed: str = Field(min_length=1, max_length=800)
+    why_it_matters: str = Field(min_length=1, max_length=800)
+    key_points: list[str] = Field(default_factory=list, max_length=5)
+    confidence: Literal["high", "medium", "low"]
+
+    @model_validator(mode="after")
+    def _trim_points(self) -> "DiagnosisHistoryInterpretation":
+        self.key_points = [s.strip() for s in self.key_points if s and s.strip()][:5]
+        return self
+
+
+class DiagnosisHistoryInterpretRequest(BaseModel):
+    diagnosis_id: str = Field(min_length=1, max_length=80)
+    period_key: str | None = Field(
+        default=None,
+        max_length=20,
+        description="current | daily | weekly | monthly",
+    )
+    locale: str = Field(default="tr", max_length=8)
+    refresh: bool = False
+
+
+class DiagnosisHistoryInterpretTrendPublic(BaseModel):
+    direction: str = "stable"
+    reason_codes: list[str] = Field(default_factory=list)
+    substantive_count: int | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+class DiagnosisHistoryInterpretResponse(BaseModel):
+    diagnosis_id: str
+    period_key: str
+    interpretation: DiagnosisHistoryInterpretation | None = None
+    trend_direction: str = "stable"
+    trend: DiagnosisHistoryInterpretTrendPublic | None = None
+    run_id: int | None = None
+    cached: bool = False
+    generated_at: str | None = None
+    context_fingerprint: str | None = None
+    disclaimer: str = ""
+    error_code: str | None = None
 
 
 class SummarizeLeadRequest(BaseModel):

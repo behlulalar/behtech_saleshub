@@ -355,6 +355,7 @@ export interface AiStatusResponse {
   daily_email_enabled?: boolean;
   chat_available?: boolean;
   diagnosis_interpret_available?: boolean;
+  diagnosis_history_interpret_available?: boolean;
 }
 
 export interface IntelligenceInsightItem {
@@ -417,6 +418,149 @@ export interface DiagnosisListResponse {
   items: DiagnosisItem[];
 }
 
+/** DE-5 diagnosis lifecycle state (DiagnosisCase / Snapshot). */
+export type DiagnosisLifecycleState =
+  | 'new'
+  | 'active'
+  | 'improving'
+  | 'worsening'
+  | 'resolved';
+
+export type DiagnosisHistoryPeriodKey = 'daily' | 'weekly' | 'monthly' | 'current';
+
+export interface DiagnosisSyncResponse {
+  period: string;
+  created_cases: number;
+  updated_cases: number;
+  new_snapshots: number;
+  resolved_cases: number;
+  reopened_cases: number;
+  unchanged_cases: number;
+  period_keys_in_scope: string[];
+  organization_id: number;
+}
+
+export interface DiagnosisHistorySnapshot {
+  id: number;
+  observed_at: string;
+  state: string;
+  severity: string;
+  metric: string;
+  current_value?: number | null;
+  engine_previous_value?: number | null;
+  change_percent?: number | null;
+  affected_lead_count: number;
+  impact: Record<string, unknown>;
+  top_leads: Record<string, unknown>[];
+  evidence: Record<string, unknown>;
+  fingerprint: string;
+  trigger: string;
+  created_at: string;
+}
+
+/** DE-5.1 trend direction (not DiagnosisCase.state). */
+export type DiagnosisTrendDirection =
+  | 'newly_detected'
+  | 'worsening'
+  | 'improving'
+  | 'stable'
+  | 'resolved'
+  | 'reopened';
+
+export interface DiagnosisTrendSnapshotRef {
+  observed_at: string;
+  state: string;
+  severity: string;
+  metric: string;
+  current_value?: number | null;
+  change_percent?: number | null;
+  affected_lead_count: number;
+  trigger: string;
+}
+
+export interface DiagnosisTrendChanges {
+  severity_from?: string | null;
+  severity_to?: string | null;
+  severity_delta: number;
+  current_value_from?: number | null;
+  current_value_to?: number | null;
+  current_value_delta?: number | null;
+  metric_direction: number;
+  affected_lead_count_from: number;
+  affected_lead_count_to: number;
+  affected_lead_count_delta: number;
+  high_priority_count_from: number;
+  high_priority_count_to: number;
+  high_priority_count_delta: number;
+  medium_priority_count_from: number;
+  medium_priority_count_to: number;
+  medium_priority_count_delta: number;
+  low_priority_count_from: number;
+  low_priority_count_to: number;
+  low_priority_count_delta: number;
+  lead_set_added_count: number;
+  lead_set_removed_count: number;
+  lead_set_size_from: number;
+  lead_set_size_to: number;
+}
+
+export interface DiagnosisTrendWorstPoint {
+  observed_at: string;
+  severity: string;
+  metric: string;
+  current_value?: number | null;
+  affected_lead_count: number;
+}
+
+export interface DiagnosisTrendWindowMetrics {
+  n: number;
+  observation_count: number;
+  dominant_direction: string;
+  min_current_value?: number | null;
+  max_current_value?: number | null;
+  min_affected_lead_count?: number | null;
+  max_affected_lead_count?: number | null;
+  worst_severity?: string | null;
+}
+
+export interface DiagnosisTrendMetrics {
+  active_duration_seconds?: number | null;
+  last_substantive_change_at?: string | null;
+  reopen_count: number;
+  substantive_count: number;
+  total_snapshot_count: number;
+  worst_point?: DiagnosisTrendWorstPoint | null;
+  window: DiagnosisTrendWindowMetrics;
+}
+
+export interface DiagnosisTrendSummary {
+  direction: DiagnosisTrendDirection | string;
+  reason_codes: string[];
+  changes: DiagnosisTrendChanges;
+  previous_snapshot?: DiagnosisTrendSnapshotRef | null;
+  current_snapshot?: DiagnosisTrendSnapshotRef | null;
+  substantive_count: number;
+  metrics: DiagnosisTrendMetrics;
+}
+
+export interface DiagnosisHistoryResponse {
+  diagnosis_id: string;
+  diagnosis_type: string;
+  period_key: string;
+  state: string;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  last_synced_at?: string | null;
+  resolved_at?: string | null;
+  latest_snapshot_id?: number | null;
+  page: number;
+  limit: number;
+  total: number;
+  snapshots: DiagnosisHistorySnapshot[];
+  /** Deterministic trend from full case history (not Case.state). */
+  trend?: DiagnosisTrendSummary | null;
+}
+
 export interface DiagnosisRecommendedAction {
   title: string;
   reason: string;
@@ -469,6 +613,40 @@ export interface DiagnosisInterpretResponse {
   disclaimer: string;
   error_code: string | null;
   proposal_bridge?: ProposalBridgeSummary | null;
+}
+
+export interface DiagnosisHistoryInterpretation {
+  summary: string;
+  what_changed: string;
+  why_it_matters: string;
+  key_points: string[];
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface DiagnosisHistoryInterpretRequest {
+  diagnosis_id: string;
+  period_key?: string | null;
+  locale?: string;
+  refresh?: boolean;
+}
+
+export interface DiagnosisHistoryInterpretResponse {
+  diagnosis_id: string;
+  period_key: string;
+  interpretation: DiagnosisHistoryInterpretation | null;
+  trend_direction: string;
+  trend?: {
+    direction?: string;
+    reason_codes?: string[];
+    substantive_count?: number | null;
+    metrics?: Record<string, unknown>;
+  } | null;
+  run_id: number | null;
+  cached: boolean;
+  generated_at?: string | null;
+  context_fingerprint?: string | null;
+  disclaimer: string;
+  error_code: string | null;
 }
 
 export interface SummarizeLeadRequest {
