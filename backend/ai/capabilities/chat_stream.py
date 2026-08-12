@@ -1,4 +1,4 @@
-"""Faz 7 — Sales chat SSE event stream."""
+"""Sales chat SSE event stream."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ai.capabilities.chat import SYSTEM_BASE, _build_context_block, normalize_history
+from ai.assistant_memory import save_memory
+from ai.capabilities.chat import SYSTEM_BASE, _build_context_block, _history_for_request
 from ai.llm_client import assert_llm_configured, stream_chat_completion_messages
 from ai.llm_config import provider_and_model
 from ai.store import create_run, finish_run_failed, finish_run_success
@@ -26,13 +27,19 @@ def _build_messages(
     locale: str,
 ) -> list[dict]:
     include_revenue = (user.account_type or "company") == "company"
-    context = _build_context_block(db, org_id, include_revenue=include_revenue)
+    request_history = _history_for_request(db, user, org_id, history)
+    context = _build_context_block(
+        db,
+        org_id,
+        include_revenue=include_revenue,
+        message=message,
+    )
     system = (
         f"{SYSTEM_BASE}\nDil tercihi: {locale}\n\n"
         f"Güncel CRM özeti (JSON):\n{context}"
     )
     messages: list[dict] = [{"role": "system", "content": system}]
-    messages.extend(normalize_history(history))
+    messages.extend(request_history)
     messages.append({"role": "user", "content": message[:4000]})
     return messages
 
@@ -46,9 +53,7 @@ def iter_sales_chat_events(
     history: list[dict] | None = None,
     locale: str = "tr",
 ) -> Iterator[dict[str, Any]]:
-    """
-    Yields dict events: delta {type, content}, done {type, run_id}, error {type, detail}.
-    """
+    """Yields delta, done and error events for the streaming assistant."""
     assert_llm_configured()
     ensure_quota(db, org_id, estimated_tokens=800)
 
@@ -57,12 +62,13 @@ def iter_sales_chat_events(
         yield {"type": "error", "detail": "empty_message"}
         return
 
+    request_history = _history_for_request(db, user, org_id, history)
     messages = _build_messages(
         db,
         user=user,
         org_id=org_id,
         message=text,
-        history=history,
+        history=request_history,
         locale=locale,
     )
     provider, model = provider_and_model()
@@ -74,7 +80,7 @@ def iter_sales_chat_events(
         input_data={"locale": locale, "message_len": len(text), "stream": True},
         provider=provider,
         model=model,
-        prompt_version="sales_chat_v1",
+        prompt_version="sales_chat_v2",
     )
     db.flush()
     started = time.perf_counter()
@@ -109,6 +115,11 @@ def iter_sales_chat_events(
             duration_ms=duration_ms,
         )
         db.commit()
+        save_memory(
+            org_id,
+            user.id,
+            [*request_history, {"role": "user", "content": text}, {"role": "assistant", "content": reply}],
+        )
         yield {"type": "done", "run_id": run.id}
     except Exception:
         duration_ms = int((time.perf_counter() - started) * 1000)
