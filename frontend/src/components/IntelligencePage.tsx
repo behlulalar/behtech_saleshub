@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import AiActionProposals from './ai/AiActionProposals';
 import AiDe4ActionsInbox from './ai/AiDe4ActionsInbox';
-import AiOpsPanel from './ai/AiOpsPanel';
 import AiPriorityList from './ai/AiPriorityList';
 import CompanyIntelligenceCard from './ai/CompanyIntelligenceCard';
 import SalesDiagnosesCard from './ai/SalesDiagnosesCard';
+import SalesAssistantPage from './ai/SalesAssistantPage';
 import type { IntelligenceView } from '../types';
 
 interface Props {
@@ -56,11 +56,7 @@ export default function IntelligencePage({ view, isOwner, onEditLead }: Props) {
         </div>
       );
     case 'intel-assistant':
-      return (
-        <div className="min-w-0 space-y-6 max-lg:space-y-4">
-          <AiOpsPanel isOwner={isOwner} />
-        </div>
-      );
+      return <SalesAssistantPage />;
     default:
       return null;
   }
