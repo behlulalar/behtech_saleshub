@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     ai_daily_email: bool = False
     ai_chat_enabled: bool = False
     ai_provider: str = "openai"
+    assistant_redis_enabled: bool = False
+    assistant_redis_url: str = "redis://localhost:6379/0"
+    """Short-term assistant memory. Keep disabled until Redis is provisioned."""
     """Primary LLM vendor for general AI features (openai|azure). DE-3 interpret always uses OpenAI API only."""
     # DE-3: AI Diagnosis Interpreter (POST /api/ai/diagnosis/interpret)
     ai_diagnosis_interpret_enabled: bool = False
