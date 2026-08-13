@@ -479,6 +479,23 @@ def get_diagnosis(db: Session, org_id: int, *, diagnosis_id: str) -> dict:
     }
 
 
+def lead_has_pending_offer_signal(lead: Lead) -> bool:
+    """
+    Shared pending-offer predicate for get_pending_offers + get_daily_sales_brief.
+
+    Pending when not sold AND (offer text present OR durum in Teklif Verildi).
+    Demo Gönderildi counts when Lead.teklif is populated (offer recorded).
+    """
+    from intelligence.diagnosis.constants import PENDING_OFFER_STATUS
+
+    sold = float(lead.satis_tutari or 0) > 0
+    if sold:
+        return False
+    if bool((lead.teklif or "").strip()):
+        return True
+    return (lead.durum or "") in PENDING_OFFER_STATUS
+
+
 def get_pending_offers(
     db: Session,
     org_id: int,
@@ -490,11 +507,11 @@ def get_pending_offers(
     DE-6.4 — leads with an offer signal that have not converted to a sale.
 
     READ-ONLY. Uses CRM lead fields + reliable teklif_verildi dates (no mutation).
+    Same predicate as get_daily_sales_brief pending section (via lead_has_pending_offer_signal).
     """
     from datetime import date as date_cls
 
     from app_timezone import local_today
-    from intelligence.diagnosis.constants import PENDING_OFFER_STATUS
 
     limit = _clamp_limit(limit, default=10, hi=25)
     try:
@@ -505,11 +522,7 @@ def get_pending_offers(
     leads = db.query(Lead).filter(Lead.user_id == org_id).all()
     candidates: list[Lead] = []
     for lead in leads:
-        sold = float(lead.satis_tutari or 0) > 0
-        if sold:
-            continue
-        has_offer = bool((lead.teklif or "").strip()) or (lead.durum or "") in PENDING_OFFER_STATUS
-        if not has_offer:
+        if not lead_has_pending_offer_signal(lead):
             continue
         candidates.append(lead)
 

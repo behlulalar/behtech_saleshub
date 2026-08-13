@@ -26,6 +26,11 @@ _BROAD_RE = re.compile(
     r"\ben\s+kritik\w*|"
     r"\ben\s+[oö]nemli\s+lead\w*|"
     r"\bbekleyen\s+teklif\w*|"
+    r"\ba[cç][ıi]k\s+teklif\w*|"
+    r"\bsat[ıi][sş]a\s+d[oö]n[uü][sş]meyen\s+teklif\w*|"
+    r"\bteklif\s+verip\b|"
+    r"\bhangi\s+teklif\w*\s+bekliyor|"
+    r"\bteklifleri\s+g[oö]ster|"
     r"\bg[uü]nl[uü]k\s+(?:sat[ıi][sş]|brief|özet)\w*|"
     r"\bbu\s+hafta\s+kritik\w*|"
     r"\bsat[ıi][sş]a\s+en\s+yak[ıi]n\w*|"
@@ -35,6 +40,31 @@ _BROAD_RE = re.compile(
     r"\bwhat\s+should\s+i\s+do\s+today\b|"
     r"\bpending\s+offers\b|"
     r"\bcritical\s+leads\b"
+    r")"
+)
+
+# Portfolio pending-offer list (must call get_pending_offers). Entity-scoped offers excluded.
+_PENDING_OFFERS_PORTFOLIO_RE = re.compile(
+    r"(?i)(?:"
+    r"\bbekleyen\s+teklif\w*|"
+    r"\ba[cç][ıi]k\s+teklif\w*|"
+    r"\bsat[ıi][sş]a\s+d[oö]n[uü][sş]meyen\s+teklif\w*|"
+    r"\bteklif\s+verip\s+(?:\w+\s+){0,4}sat|"
+    r"\bhangi\s+(?:m[uü][sş]teri\w*|lead\w*|i[sş]letme\w*)\w*.{0,40}teklif|"
+    r"\bhangi\s+teklif\w*\s+bekliyor|"
+    r"\bteklifleri\s+(?:g[oö]ster|listele|neler)|"
+    r"\bpending\s+offers?\b|"
+    r"\bopen\s+offers?\b"
+    r")"
+)
+
+_ENTITY_SCOPED_PENDING_OFFER_RE = re.compile(
+    r"(?i)(?:"
+    # Turkish genitive: 'ın/'in/'un/'ün and 'nın/'nin/'nun/'nün
+    r"'(?:n?[iıuü]n)\s+bekleyen\s+teklif|"
+    r"\b(?:onun|bunun)\s+bekleyen\s+teklif|"
+    r"'(?:n?[iıuü]n)\s+teklif(?:i|ini)?\b|"
+    r"\b(?:onun|bunun)\s+teklif(?:i|ini)?\b"
     r")"
 )
 
@@ -119,6 +149,16 @@ class EntityResolution:
 
 def is_broad_portfolio_intent(message: str) -> bool:
     return bool(_BROAD_RE.search(message or ""))
+
+
+def is_pending_offers_portfolio_intent(message: str) -> bool:
+    """True for org-wide pending-offer list questions (not a single named lead)."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    if _ENTITY_SCOPED_PENDING_OFFER_RE.search(text):
+        return False
+    return bool(_PENDING_OFFERS_PORTFOLIO_RE.search(text))
 
 
 def is_implicit_followup(message: str) -> bool:

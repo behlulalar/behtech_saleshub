@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     azure_openai_deployment_chat: str = ""
     openai_api_key: str = ""
     openai_chat_model: str = "gpt-4o-mini"
-    ai_monthly_token_quota: int = 200_000
+    ai_monthly_token_quota: int = 400_000
     ai_max_output_tokens: int = 600
     ai_llm_timeout_sec: int = 25
     ai_include_pii: bool = False

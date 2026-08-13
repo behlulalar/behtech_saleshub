@@ -491,6 +491,17 @@ export interface AppCopy {
     emptySuggestion1: string;
     emptySuggestion2: string;
     emptySuggestion3: string;
+    emptySuggestion4: string;
+    welcomeTitle: string;
+    welcomeBody: string;
+    toolChecking: string;
+    toolPreparing: string;
+    streamInterrupted: string;
+    createFailed: string;
+    relativeJustNow: string;
+    relativeMinutes: string;
+    relativeHours: string;
+    relativeDays: string;
   };
   leadImport: {
     title: string;
@@ -1171,21 +1182,22 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       updatedAt: 'Güncelleme',
     },
     chat: {
-      title: 'Satış asistanı',
-      subtitle: 'KPI ve lead özetine dayalı — salt okunur',
+      title: 'Satış Asistanı',
+      subtitle:
+        'CRM verilerinizi analiz edin, müşterileriniz hakkında soru sorun ve satış fırsatlarını keşfedin.',
       pageTitle: 'Satış Asistanı',
       pageSubtitle:
-        'CRM verilerinizi sorun, analiz edin ve takip etmeniz gereken fırsatları bulun.',
+        'CRM verilerinizi analiz edin, müşterileriniz hakkında soru sorun ve satış fırsatlarını keşfedin.',
       open: 'Asistanı aç',
       close: 'Kapat',
       placeholder: 'Sorunuzu yazın… (Enter gönderir)',
-      composerPlaceholder: 'CRM hakkında bir şey sorun...',
+      composerPlaceholder: 'Satış asistanına bir soru sorun...',
       composerLabel: 'Asistan mesajı',
       send: 'Gönder',
-      sendFailed: 'Asistan şu anda yanıt veremiyor.',
-      thinking: 'Düşünüyor…',
-      emptyHint: 'Örn: “Bu hafta hangi lead’lere öncelik vermeliyim?” veya “Cevap bekleyenler ne durumda?”',
-      disclaimer: 'AI yanıtı bilgilendirme amaçlıdır; kayıtları panelden doğrulayın.',
+      sendFailed: 'Yanıt alınamadı. Bağlantınızı kontrol edip tekrar deneyin.',
+      thinking: 'Yanıt hazırlanıyor…',
+      emptyHint: 'Örn: “Bugün ne yapmalıyım?” veya “Bekleyen teklifler neler?”',
+      disclaimer: 'AI yanıtı bilgilendirme amaçlıdır; kritik kararlar için CRM kayıtlarını doğrulayın.',
       newChat: 'Yeni Sohbet',
       loadFailed: 'Sohbet geçmişi yüklenemedi',
       loadingHistory: 'Geçmiş yükleniyor…',
@@ -1197,17 +1209,17 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       groupYesterday: 'Dün',
       groupLast7: 'Son 7 gün',
       groupOlder: 'Daha eski',
-      listFailed: 'Konuşmalar yüklenemedi.',
-      historyFailed: 'Bu sohbet yüklenemedi.',
+      listFailed: 'Konuşmalar yüklenemedi. Lütfen tekrar deneyin.',
+      historyFailed: 'Bu sohbet yüklenemedi. Lütfen tekrar deneyin.',
       archiveChat: 'Sohbeti arşivle',
-      archiveFailed: 'Sohbet arşivlenemedi.',
+      archiveFailed: 'Sohbet arşivlenemedi. Lütfen tekrar deneyin.',
       retry: 'Tekrar dene',
       noConversations: 'Henüz sohbet yok.',
       openSidebar: 'Sohbet listesini aç',
       closeSidebar: 'Sohbet listesini kapat',
       unavailableTitle: 'Asistan şu an kullanılamıyor',
       unavailableBody: 'AI sohbet bu hesap için aktif değil veya yapılandırılmamış.',
-      suggestionOffer: "Roof Tattoo'ya ne teklif vermiştik?",
+      suggestionOffer: "Roof Tattoo'nun teklifini hatırlıyor musun?",
       suggestionFollowups: 'Bugün takip etmem gereken leadler hangileri?',
       suggestionSales: 'Bu ay satışlar nasıl?',
       suggestionRisk: 'En riskli leadler hangileri?',
@@ -1217,6 +1229,18 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       emptySuggestion1: 'Bugün ne yapmalıyım?',
       emptySuggestion2: 'En kritik leadler hangileri?',
       emptySuggestion3: 'Bekleyen teklifler neler?',
+      emptySuggestion4: "Roof Tattoo'nun teklifini hatırlıyor musun?",
+      welcomeTitle: 'Bugün nasıl yardımcı olabilirim?',
+      welcomeBody:
+        "CRM'inizdeki müşteriler, teklifler, aktiviteler ve satış fırsatları hakkında soru sorabilirsiniz.",
+      toolChecking: 'Bilgiler kontrol ediliyor…',
+      toolPreparing: 'Yanıt hazırlanıyor…',
+      streamInterrupted: 'Yanıt yarım kaldı. Lütfen tekrar deneyin.',
+      createFailed: 'Yeni sohbet oluşturulamadı. Lütfen tekrar deneyin.',
+      relativeJustNow: 'Az önce',
+      relativeMinutes: '{n} dk',
+      relativeHours: '{n} sa',
+      relativeDays: '{n} g',
     },
     leadImport: {
       title: 'Excel ile Toplu Ekle',
@@ -1908,20 +1932,20 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       updatedAt: 'Updated',
     },
     chat: {
-      title: 'Sales assistant',
-      subtitle: 'Based on KPI & lead snapshot — read-only',
+      title: 'Sales Assistant',
+      subtitle: 'Analyze your CRM, ask about customers, and discover sales opportunities.',
       pageTitle: 'Sales Assistant',
-      pageSubtitle: 'Ask about your CRM data, analyze it, and find opportunities to follow up.',
+      pageSubtitle: 'Analyze your CRM, ask about customers, and discover sales opportunities.',
       open: 'Open assistant',
       close: 'Close',
       placeholder: 'Type your question… (Enter to send)',
-      composerPlaceholder: 'Ask something about your CRM...',
+      composerPlaceholder: 'Ask the sales assistant a question...',
       composerLabel: 'Assistant message',
       send: 'Send',
-      sendFailed: 'The assistant cannot reply right now.',
-      thinking: 'Thinking…',
-      emptyHint: 'e.g. “Which leads should I prioritize this week?”',
-      disclaimer: 'AI replies are informational; verify records in the app.',
+      sendFailed: 'Could not get a reply. Check your connection and try again.',
+      thinking: 'Preparing a reply…',
+      emptyHint: 'e.g. “What should I do today?” or “Which offers are still pending?”',
+      disclaimer: 'AI replies are informational; verify critical decisions against CRM records.',
       newChat: 'New chat',
       loadFailed: 'Could not load chat history',
       loadingHistory: 'Loading history…',
@@ -1933,17 +1957,17 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       groupYesterday: 'Yesterday',
       groupLast7: 'Last 7 days',
       groupOlder: 'Older',
-      listFailed: 'Could not load conversations.',
-      historyFailed: 'Could not load this chat.',
+      listFailed: 'Could not load conversations. Please try again.',
+      historyFailed: 'Could not load this chat. Please try again.',
       archiveChat: 'Archive chat',
-      archiveFailed: 'Could not archive chat.',
+      archiveFailed: 'Could not archive chat. Please try again.',
       retry: 'Try again',
       noConversations: 'No chats yet.',
       openSidebar: 'Open chat list',
       closeSidebar: 'Close chat list',
       unavailableTitle: 'Assistant unavailable',
       unavailableBody: 'AI chat is not enabled or configured for this account.',
-      suggestionOffer: 'What offer did we send to Roof Tattoo?',
+      suggestionOffer: 'Do you remember the Roof Tattoo offer?',
       suggestionFollowups: 'Which leads should I follow up today?',
       suggestionSales: 'How are sales this month?',
       suggestionRisk: 'Which leads are most at risk?',
@@ -1953,6 +1977,17 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       emptySuggestion1: 'What should I do today?',
       emptySuggestion2: 'Which leads are most critical?',
       emptySuggestion3: 'Which offers are still pending?',
+      emptySuggestion4: 'Do you remember the Roof Tattoo offer?',
+      welcomeTitle: 'How can I help you today?',
+      welcomeBody: 'Ask about customers, offers, activities, and sales opportunities in your CRM.',
+      toolChecking: 'Verifying details…',
+      toolPreparing: 'Preparing a reply…',
+      streamInterrupted: 'The reply was interrupted. Please try again.',
+      createFailed: 'Could not create a new chat. Please try again.',
+      relativeJustNow: 'Just now',
+      relativeMinutes: '{n}m',
+      relativeHours: '{n}h',
+      relativeDays: '{n}d',
     },
     leadImport: {
       title: 'Bulk Import from Excel',

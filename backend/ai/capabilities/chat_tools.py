@@ -56,11 +56,11 @@ Gerekirse ek: get_followup_candidates, get_pending_offers, get_diagnoses, get_sa
 3) bekleyen / eski teklifler
 4) diğer diagnosis adayları
 
-Boş listeler:
+Boş listeler (yalnızca ilgili tool sonucu boşsa):
 - follow-up yoksa: "Şu anda CRM'de follow-up adayı görünmüyor."
-- pending offer yoksa: "Bekleyen teklif görünmüyor."
+- pending offer yoksa (get_pending_offers.count==0): "Bekleyen teklif görünmüyor."
 - diagnosis yoksa: "Şu anda aktif diagnosis bulunmuyor."
-Fake lead üretme.
+Tool çağırmadan "yok" DEME. Fake lead üretme.
 
 Cevap biçimi (kısa):
 ## Bugünkü önceliklerin
@@ -68,17 +68,30 @@ Cevap biçimi (kısa):
 Sonra 2–3 satır genel durum (follow-up / teklif / diagnosis / satış metriği).
 "Satışa en yakın" = teklif süreci devam eden / yakın aktivite; yüzde tahmin yok.
 
+## Pending offers (portfolio) — ZORUNLU TOOL
+Explicit pending-offer list questions:
+"Bekleyen teklifler neler?", "Bekleyen teklifler var mı?", "Hangi teklifler bekliyor?",
+"Teklif verip satış yapmadığımız müşteriler?", "Açık teklifler neler?",
+"Satışa dönüşmeyen teklifler?", "Hangi müşterilere teklif verdik?", "Bekleyen teklifleri göster":
+→ MUTLAKA get_pending_offers çağır; conversation memory / daily brief özetine güvenme.
+→ get_daily_sales_brief bu sorular için yeterli DEĞİL.
+→ ACTIVE lead olsa bile portfolio sorgusu: tek lead'e daraltma.
+→ get_pending_offers.count>0 ise o teklifleri listele; count==0 ise "yok" diyebilirsin.
+Entity-scoped ("Hakan'ın bekleyen teklifi?", "Roof Tattoo'nun teklifi?"):
+→ get_lead_offer / get_lead (± search_leads); get_pending_offers zorunlu değil.
+
 ## Diğer multi-tool
-- Teklif → search_leads → get_lead_offer
+- Teklif (tek lead) → search_leads → get_lead_offer
 - "Neden kapanmadı?" → search_leads → get_lead → get_lead_activities (± offer)
 - Risk → get_diagnoses (± get_diagnosis)
 - Satışlar → get_sales_metrics
-- Teklif verilip satılmayanlar / bekleyen teklifler → get_pending_offers (veya get_daily_sales_brief).
+- Teklif verilip satılmayanlar / bekleyen teklifler (portfolio) → get_pending_offers.
   Tool sonuçlarında offer varsa "bekleyen teklif yok" DEME.
 
 ## Memory
 Conversation memory kimlik bağlamı sağlar; CRM gerçeği tool'dan gelir.
 Memory eski teklifi tool'suz kesin doğru sayma.
+Pending-offer listesinde memory'den "yok" sonucu uydurma.
 
 ## Conversational entity continuity (DE-6.7)
 ACTIVE_CONVERSATIONAL_LEAD set ise ve kullanıcı örtük follow-up soruyorsa
@@ -125,6 +138,37 @@ def _sanitize_args(args: dict) -> dict:
     cleaned.pop("org_id", None)
     cleaned.pop("user_id", None)
     return cleaned
+
+
+def _latest_user_message(messages: list[dict]) -> str:
+    for msg in reversed(messages or []):
+        if msg.get("role") == "user":
+            return str(msg.get("content") or "")
+    return ""
+
+
+def _tool_choice_for_iteration(
+    messages: list[dict],
+    *,
+    iteration: int,
+    tools_called: set[str],
+) -> str | dict:
+    """Force get_pending_offers on first turn for portfolio pending-offer questions."""
+    if iteration != 1 or "get_pending_offers" in tools_called:
+        return "auto"
+    from ai.entity_continuity import is_pending_offers_portfolio_intent
+
+    if is_pending_offers_portfolio_intent(_latest_user_message(messages)):
+        return {"type": "function", "function": {"name": "get_pending_offers"}}
+    return "auto"
+
+
+def _synthetic_pending_offers_call() -> dict:
+    return {
+        "id": "forced_pending_offers",
+        "type": "function",
+        "function": {"name": "get_pending_offers", "arguments": "{}"},
+    }
 
 
 def build_chat_messages(
@@ -194,20 +238,42 @@ def run_tool_loop(
     entity_ctx: dict[str, Any] | None = None,
 ) -> tuple[str, dict, list[dict]]:
     """Returns (reply, usage_totals, tool_trace)."""
+    from ai.entity_continuity import is_pending_offers_portfolio_intent
+
     assert_llm_configured()
     usage_total: dict[str, Any] = {}
     tool_trace: list[dict] = []
     working = list(messages)
+    tools_called: set[str] = set()
+    user_message = _latest_user_message(messages)
+    require_pending = is_pending_offers_portfolio_intent(user_message)
 
     for iteration in range(1, MAX_TOOL_ITERATIONS + 1):
+        choice = _tool_choice_for_iteration(
+            working, iteration=iteration, tools_called=tools_called
+        )
         assistant_msg, usage = chat_completion_messages_with_tools(
             messages=working,
             tools=CRM_TOOL_DEFINITIONS,
-            tool_choice="auto",
+            tool_choice=choice,
         )
         _add_usage(usage_total, usage)
 
-        tool_calls = assistant_msg.get("tool_calls") or []
+        tool_calls = list(assistant_msg.get("tool_calls") or [])
+        if (
+            not tool_calls
+            and require_pending
+            and "get_pending_offers" not in tools_called
+            and iteration == 1
+        ):
+            # Hard fallback: never answer portfolio pending-offers without CRM tool truth.
+            tool_calls = [_synthetic_pending_offers_call()]
+            assistant_msg = {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": tool_calls,
+            }
+
         if not tool_calls:
             reply = (assistant_msg.get("content") or "").strip()
             return reply, usage_total, tool_trace
@@ -221,6 +287,7 @@ def run_tool_loop(
             name2, _args2, result = _execute_bound_tool(
                 db, org_id, name=name, args=args, entity_ctx=entity_ctx
             )
+            tools_called.add(name2)
             duration_ms = int((time.perf_counter() - started) * 1000)
             step = {
                 "type": "tool",
@@ -271,19 +338,39 @@ def iter_tool_aware_chat_events(
     entity_ctx: dict[str, Any] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Yield tool_start / tool_done / delta events; ends with _internal_done."""
+    from ai.entity_continuity import is_pending_offers_portfolio_intent
+
     assert_llm_configured()
     usage_total: dict[str, Any] = {}
     working = list(messages)
     final_reply = ""
+    tools_called: set[str] = set()
+    user_message = _latest_user_message(messages)
+    require_pending = is_pending_offers_portfolio_intent(user_message)
 
     for iteration in range(1, MAX_TOOL_ITERATIONS + 1):
+        choice = _tool_choice_for_iteration(
+            working, iteration=iteration, tools_called=tools_called
+        )
         assistant_msg, usage = chat_completion_messages_with_tools(
             messages=working,
             tools=CRM_TOOL_DEFINITIONS,
-            tool_choice="auto",
+            tool_choice=choice,
         )
         _add_usage(usage_total, usage)
-        tool_calls = assistant_msg.get("tool_calls") or []
+        tool_calls = list(assistant_msg.get("tool_calls") or [])
+        if (
+            not tool_calls
+            and require_pending
+            and "get_pending_offers" not in tools_called
+            and iteration == 1
+        ):
+            tool_calls = [_synthetic_pending_offers_call()]
+            assistant_msg = {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": tool_calls,
+            }
         if not tool_calls:
             final_reply = (assistant_msg.get("content") or "").strip()
             break
@@ -303,6 +390,7 @@ def iter_tool_aware_chat_events(
             name2, _args2, result = _execute_bound_tool(
                 db, org_id, name=name, args=args, entity_ctx=entity_ctx
             )
+            tools_called.add(name2)
             duration_ms = int((time.perf_counter() - started) * 1000)
             append_run_step(
                 db,
