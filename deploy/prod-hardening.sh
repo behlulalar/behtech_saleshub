@@ -93,11 +93,31 @@ if ! command -v chronyc &>/dev/null; then
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y chrony
 fi
+# Large step always allowed — otherwise clock can stay hours ahead and digests fire early.
+if [ -f /etc/chrony/chrony.conf ]; then
+  if grep -qE '^makestep' /etc/chrony/chrony.conf; then
+    sed -i 's/^makestep.*/makestep 1.0 -1/' /etc/chrony/chrony.conf
+  else
+    echo 'makestep 1.0 -1' >> /etc/chrony/chrony.conf
+  fi
+fi
 systemctl enable --now chrony
+systemctl restart chrony
+# Hard sync if slew-only left the clock hours off
+if chronyc tracking 2>/dev/null | awk '/System time/{exit !(sqrt($4*$4)>60)}'; then
+  echo "  ⚠ large NTP offset — hard stepping clock"
+  systemctl stop chrony
+  chronyd -q 'server time.ume.tubitak.gov.tr iburst' 2>/dev/null \
+    || chronyd -q 'server time.cloudflare.com iburst' 2>/dev/null \
+    || true
+  systemctl start chrony
+fi
 chronyc makestep 2>/dev/null || true
 hwclock --systohc --utc 2>/dev/null || true
 if chronyc tracking | grep -q "System time"; then
-  echo "  ✓ chrony aktif ($(chronyc tracking | awk '/Reference ID/{print $3}' | tr -d '()'))"
+  OFF=$(chronyc tracking | awk '/System time/{print $4}')
+  REF=$(chronyc tracking | awk '/Reference ID/{print $3}' | tr -d '()')
+  echo "  ✓ chrony aktif (ref=$REF offset=${OFF}s)"
 else
   echo "  ⚠ chrony durumunu kontrol edin: chronyc tracking"
 fi
