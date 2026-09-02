@@ -8,7 +8,63 @@ from dashboard import build_dashboard
 from database import User
 from email_service import send_automation_email
 from reports import build_daily_report
+from revenue import list_payment_events
 from roles import ROLE_OWNER
+
+
+def _owner_users(db: Session) -> list[User]:
+    return db.query(User).filter(User.role == ROLE_OWNER).all()
+
+
+def _format_try(amount: float) -> str:
+    return f"{amount:,.0f} ₺".replace(",", ".")
+
+
+def format_revenue_digest_lines(
+    *,
+    today_total: float,
+    today_count: int,
+    month_total: float,
+    year_total: float,
+    today_items: list[tuple[str, float, str]],
+) -> list[str]:
+    """Mail gövdesi: tahsilat, kaydedildiği güne göre (teklif tarihi değil)."""
+    lines = [
+        "Alınan ödemeler (kayıt gününe göre):",
+        f"  Bugün: {_format_try(today_total)} · {today_count} ödeme",
+        f"  Bu ay: {_format_try(month_total)}",
+        f"  Bu yıl: {_format_try(year_total)}",
+    ]
+    if today_items:
+        lines.append("")
+        lines.append("Bugünkü tahsilatlar:")
+        for name, amount, offer in today_items[:12]:
+            extra = f" · teklif {offer}" if offer else ""
+            lines.append(f"  • {name} — {_format_try(amount)}{extra}")
+    return lines
+
+
+def collect_revenue_digest_lines(db: Session, user_id: int) -> list[str]:
+    today = local_today()
+    events = list_payment_events(db, user_id)
+    today_events = [event for event in events if event.paid_on == today]
+    month_events = [
+        event
+        for event in events
+        if event.paid_on and event.paid_on.year == today.year and event.paid_on.month == today.month
+    ]
+    year_events = [event for event in events if event.paid_on and event.paid_on.year == today.year]
+    today_items = [
+        (event.lead.isletme_adi, event.amount, (event.lead.teklif or "").strip())
+        for event in today_events
+    ]
+    return format_revenue_digest_lines(
+        today_total=sum(event.amount for event in today_events),
+        today_count=len(today_events),
+        month_total=sum(event.amount for event in month_events),
+        year_total=sum(event.amount for event in year_events),
+        today_items=today_items,
+    )
 
 
 def _owner_users(db: Session) -> list[User]:
@@ -41,12 +97,17 @@ def _optional_ai_paragraph(db: Session, user_id: int) -> str:
         return ""
 
 
-def build_morning_digest_text(db: Session, user_id: int) -> str | None:
+def build_morning_digest_text(db: Session, user_id: int, include_revenue: bool = True) -> str | None:
     dashboard = build_dashboard(db, user_id)
     lines: list[str] = []
 
+    if include_revenue:
+        lines.extend(collect_revenue_digest_lines(db, user_id))
+
     followups = dashboard.get("cevap_bekleyen_liste") or []
     if followups:
+        if lines:
+            lines.append("")
         lines.append(f"Cevap bekleyen müşteriler ({dashboard.get('cevap_bekleyen_gun', 3)}+ gün):")
         for item in followups[:10]:
             lines.append(
@@ -101,9 +162,9 @@ def build_eod_summary_text(db: Session, user_id: int, include_revenue: bool = Tr
     if report.get("donusum_orani") is not None:
         lines.append(f"Dönüşüm oranı: %{report['donusum_orani']}")
 
-    if include_revenue and report.get("satis_sayisi") is not None:
-        lines.append(f"Satış adedi: {report['satis_sayisi']}")
-        lines.append(f"Toplam gelir: {report.get('toplam_gelir', 0):,.0f} ₺".replace(",", "."))
+    if include_revenue:
+        lines.append("")
+        lines.extend(collect_revenue_digest_lines(db, user_id))
 
     status = report.get("durum_dagilimi") or []
     if status:
@@ -143,7 +204,8 @@ def run_morning_digests(db: Session) -> int:
 
     sent = 0
     for user in _owner_users(db):
-        body = build_morning_digest_text(db, user.id)
+        include_revenue = (user.account_type or "company") == "company"
+        body = build_morning_digest_text(db, user.id, include_revenue=include_revenue)
         if not body:
             continue
         send_automation_email(
