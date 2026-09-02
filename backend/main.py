@@ -82,6 +82,7 @@ from dashboard import build_dashboard
 from funnel import build_sales_funnel
 from report_export import export_report_csv, export_report_pdf, export_report_xlsx
 from reports import build_daily_report, build_period_report, parse_report_anchor
+from revenue import build_revenue
 from roles import (
     ROLE_EMPLOYEE,
     ROLE_OWNER,
