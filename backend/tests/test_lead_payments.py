@@ -109,9 +109,9 @@ def test_deposit_appears_in_revenue_without_musteri_status(client, org):
     assert any(item["id"] == lead.id and item["satis_tutari"] == 4500 for item in data["son_satislar"])
 
 
-def test_second_payment_adds_to_received_total(client, org):
+def test_second_payment_is_counted_in_the_month_it_was_recorded(client, org):
     token, user = org
-    lead = _add_lead(user.id, teklif="8500 TL", satis_tutari=4500, satis_tarihi="2026-08-01")
+    lead = _add_lead(user.id, teklif="8500 TL", satis_tutari=4500, satis_tarihi="2025-08-01")
 
     res = client.post(
         f"/api/leads/{lead.id}/payments",
@@ -120,10 +120,48 @@ def test_second_payment_adds_to_received_total(client, org):
     )
     assert res.status_code == 200
     assert float(res.json()["satis_tutari"]) == 6500
-    assert res.json()["satis_tarihi"] == "2026-08-01"
+    assert res.json()["satis_tarihi"] == "2025-08-01"
 
-    revenue = client.get("/api/revenue", headers=_auth(token)).json()
-    assert revenue["toplam_gelir"] == 6500
+    today = date.today()
+    all_time = client.get("/api/revenue", headers=_auth(token)).json()
+    assert all_time["tum_zamanlar_gelir"] == 6500
+
+    august = client.get("/api/revenue?year=2025&month=8", headers=_auth(token)).json()
+    assert august["toplam_gelir"] == 4500
+
+    this_month = client.get(
+        f"/api/revenue?year={today.year}&month={today.month}",
+        headers=_auth(token),
+    ).json()
+    assert this_month["toplam_gelir"] == 2000
+    assert any(
+        item["id"] == lead.id and item["satis_tutari"] == 2000 and item["satis_tarihi"] == today.isoformat()
+        for item in this_month["son_satislar"]
+    )
+
+
+def test_payment_on_old_offer_appears_in_entry_month_not_offer_month(client, org):
+    token, user = org
+    lead = _add_lead(user.id, teklif="8500 TL", durum="Teklif Verildi", satis_tarihi="2025-08-09")
+
+    res = client.post(
+        f"/api/leads/{lead.id}/payments",
+        json={"amount": 4500},
+        headers=_auth(token),
+    )
+    assert res.status_code == 200
+    today = date.today()
+    assert res.json()["satis_tarihi"] == "2025-08-09"
+
+    august = client.get("/api/revenue?year=2025&month=8", headers=_auth(token)).json()
+    assert august["toplam_gelir"] == 0
+
+    this_month = client.get(
+        f"/api/revenue?year={today.year}&month={today.month}",
+        headers=_auth(token),
+    ).json()
+    assert this_month["toplam_gelir"] == 4500
+    assert this_month["bu_ay_gelir"] == 4500
 
 
 def test_invalid_payment_rejected(client, org):

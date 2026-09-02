@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from revenue import in_period, parse_offer_amount, resolve_sale_date
+from revenue import in_period, parse_offer_amount, parse_payment_increment, resolve_sale_date
 
 
 def test_parse_offer_amount():
@@ -27,3 +27,9 @@ def test_in_period_filters_year_and_month():
     assert in_period(day, 2025, None) is False
     assert in_period(None, 2026, 9) is False
     assert in_period(None, None, None) is True
+
+
+def test_parse_payment_increment_prefers_received_slice():
+    assert parse_payment_increment("4.500 TL alındı (toplam 6.500 TL)") == 4500
+    assert parse_payment_increment("6.500 TL", previous_total=4500) == 2000
+    assert parse_payment_increment("4.500 TL", previous_total=0) == 4500

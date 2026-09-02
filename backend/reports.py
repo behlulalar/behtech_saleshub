@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from dashboard import get_category_map
 from database import Lead
 from funnel import build_sales_funnel
-from revenue import _parse_date, _sale_amount, _sale_date
+from revenue import _parse_date, list_payment_events
 
 
 def _week_bounds(anchor: date) -> tuple[date, date]:
@@ -52,14 +52,11 @@ def _lead_became_customer_in_range(lead: Lead, start: date, end: date) -> bool:
     return False
 
 
-def _sales_in_range(leads: list[Lead], start: date, end: date) -> list[Lead]:
+def _sales_in_range(db: Session, user_id: int, start: date, end: date) -> list[tuple]:
     result = []
-    for lead in leads:
-        if _sale_amount(lead) <= 0:
-            continue
-        sale_day = _sale_date(lead)
-        if sale_day and start <= sale_day <= end:
-            result.append(lead)
+    for event in list_payment_events(db, user_id):
+        if event.paid_on and start <= event.paid_on <= end:
+            result.append(event)
     return result
 
 
@@ -122,19 +119,19 @@ def build_period_report(
     period_sales: list[dict] = []
 
     if include_revenue:
-        sales = _sales_in_range(leads, start, end)
+        sales = _sales_in_range(db, user_id, start, end)
         sales_count = len(sales)
-        total_revenue = round(sum(_sale_amount(lead) for lead in sales), 2)
+        total_revenue = round(sum(event.amount for event in sales), 2)
         average_sale = round(total_revenue / sales_count, 2) if sales_count else 0.0
         period_sales = [
             {
-                "isletme_adi": lead.isletme_adi,
-                "category_label": cat_map.get(lead.category, lead.category),
-                "sehir": lead.sehir,
-                "satis_tutari": _sale_amount(lead),
-                "satis_tarihi": lead.satis_tarihi or (_sale_date(lead).isoformat() if _sale_date(lead) else ""),
+                "isletme_adi": event.lead.isletme_adi,
+                "category_label": cat_map.get(event.lead.category, event.lead.category),
+                "sehir": event.lead.sehir,
+                "satis_tutari": event.amount,
+                "satis_tarihi": event.paid_on.isoformat() if event.paid_on else "",
             }
-            for lead in sorted(sales, key=lambda item: _sale_date(item) or date.min, reverse=True)
+            for event in sorted(sales, key=lambda item: item.paid_on or date.min, reverse=True)
         ]
 
     prev_start = start - timedelta(days=7 if period_type == "weekly" else 0)

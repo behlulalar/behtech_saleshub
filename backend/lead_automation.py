@@ -1,5 +1,4 @@
-from datetime import date
-
+from app_timezone import local_today
 from database import Lead
 from text_format import normalize_lead_text_fields
 
@@ -20,7 +19,7 @@ def apply_lead_automation(data: dict, existing: Lead | None = None) -> dict:
     if demo_sent or demo_date:
         result["demo_gonderildi"] = True
         if not (result.get("demo_tarihi") or "").strip():
-            result["demo_tarihi"] = demo_date or date.today().isoformat()
+            result["demo_tarihi"] = demo_date or local_today().isoformat()
 
         durum = result.get("durum")
         if existing is not None and durum is None:
@@ -31,6 +30,6 @@ def apply_lead_automation(data: dict, existing: Lead | None = None) -> dict:
     amount = float(result.get("satis_tutari") or 0)
     if amount > 0 and not (result.get("satis_tarihi") or "").strip():
         existing_date = (existing.satis_tarihi or "").strip() if existing is not None else ""
-        result["satis_tarihi"] = existing_date or date.today().isoformat()
+        result["satis_tarihi"] = existing_date or local_today().isoformat()
 
     return result

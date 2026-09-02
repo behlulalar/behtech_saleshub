@@ -399,8 +399,8 @@ export default function RevenuePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.son_satislar.map((sale) => (
-                      <tr key={sale.id} className="border-b border-surface-100 last:border-0">
+                    {data.son_satislar.map((sale, index) => (
+                      <tr key={`${sale.id}-${sale.satis_tarihi}-${sale.satis_tutari}-${index}`} className="border-b border-surface-100 last:border-0">
                         <td className="px-4 py-2.5 font-medium text-surface-900">{sale.isletme_adi}</td>
                         <td className="px-4 py-2.5 text-surface-800/70">{sale.category_label}</td>
                         <td className="px-4 py-2.5 text-surface-800/70">{sale.sehir || '—'}</td>

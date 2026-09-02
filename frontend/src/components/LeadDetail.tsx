@@ -288,7 +288,7 @@ export default function LeadDetail({
                         <p className="mt-2 text-xs text-red-600">{paymentError}</p>
                       ) : (
                         <p className="mt-2 text-[11px] text-surface-800/50">
-                          Kapora veya kısmi ödeme ekleyin. Bu tutar Gelir İstatistikleri’nde görünür; teklif değişmez.
+                          Kapora veya kısmi ödeme ekleyin. Tutar, eklediğiniz ayda Gelir İstatistikleri’nde görünür; teklif değişmez.
                         </p>
                       )}
                     </div>

@@ -2,10 +2,12 @@ from collections import defaultdict
 from calendar import monthrange
 from datetime import date, datetime
 import re
+from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from database import CategoryModel, Lead
+from app_timezone import APP_TZ
+from database import CategoryModel, Lead, LeadActivity
 
 MONTHS_TR = [
     "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
@@ -80,6 +82,81 @@ def _sale_date(lead: Lead) -> date | None:
     )
 
 
+def _as_local_date(value) -> date | None:
+    parsed = _as_date(value)
+    if parsed is None:
+        return None
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.astimezone(APP_TZ).date()
+    return parsed
+
+
+def parse_payment_increment(description: str, *, previous_total: float = 0.0) -> float:
+    """Ödeme aktivitesinden bu kaydın tutarını çıkarır (teklif tarihinden bağımsız)."""
+    text = description or ""
+    taken = re.search(r"([\d.\s]+)\s*TL\s*alındı", text, re.IGNORECASE)
+    if taken:
+        return parse_offer_amount(taken.group(1) + " TL")
+    snapshot = parse_offer_amount(text)
+    if snapshot <= 0:
+        return 0.0
+    increment = round(snapshot - previous_total, 2)
+    return increment if increment > 0 else 0.0
+
+
+class PaymentEvent(NamedTuple):
+    lead: Lead
+    amount: float
+    paid_on: date | None
+
+
+def list_payment_events(db: Session, user_id: int) -> list[PaymentEvent]:
+    """Her tahsilatı kaydedildiği güne bağlar; ilk satış/teklif tarihine yığmaz."""
+    leads = db.query(Lead).filter(Lead.user_id == user_id).all()
+    lead_by_id = {lead.id: lead for lead in leads}
+    activities = (
+        db.query(LeadActivity)
+        .filter(
+            LeadActivity.user_id == user_id,
+            LeadActivity.activity_type == "satis_kaydedildi",
+        )
+        .order_by(LeadActivity.activity_date.asc(), LeadActivity.id.asc())
+        .all()
+    )
+    running: dict[int, float] = defaultdict(float)
+    events: list[PaymentEvent] = []
+
+    for activity in activities:
+        lead = lead_by_id.get(activity.lead_id)
+        if lead is None:
+            continue
+        increment = parse_payment_increment(
+            activity.description or "",
+            previous_total=running[lead.id],
+        )
+        if increment <= 0:
+            continue
+        running[lead.id] = round(running[lead.id] + increment, 2)
+        events.append(
+            PaymentEvent(
+                lead=lead,
+                amount=increment,
+                paid_on=_as_local_date(activity.activity_date),
+            )
+        )
+
+    for lead in leads:
+        amount = _sale_amount(lead)
+        if amount <= 0:
+            continue
+        leftover = round(amount - running.get(lead.id, 0.0), 2)
+        if leftover <= 0:
+            continue
+        events.append(PaymentEvent(lead=lead, amount=leftover, paid_on=_sale_date(lead)))
+
+    return events
+
+
 def _month_key(d: date) -> str:
     return d.strftime("%Y-%m")
 
@@ -131,12 +208,10 @@ def build_revenue(
     this_month_key = _month_key(today)
     this_year = today.year
 
-    all_sales: list[tuple[Lead, float, date | None]] = []
-    for lead in leads:
-        amount = _sale_amount(lead)
-        if amount <= 0:
-            continue
-        all_sales.append((lead, amount, _sale_date(lead)))
+    all_sales: list[tuple[Lead, float, date | None]] = [
+        (event.lead, event.amount, event.paid_on)
+        for event in list_payment_events(db, user_id)
+    ]
 
     period_sales = [
         item for item in all_sales if in_period(item[2], year, month)
@@ -168,11 +243,14 @@ def build_revenue(
                 year_revenue += amount
 
     offer_total = 0.0
+    offer_leads: set[int] = set()
     for lead, amount, sale_day in period_sales:
         cat_id = lead.category
         by_category[cat_id]["gelir"] += amount
         by_category[cat_id]["satis_sayisi"] += 1
-        offer_total += parse_offer_amount(lead.teklif or "")
+        if lead.id not in offer_leads:
+            offer_total += parse_offer_amount(lead.teklif or "")
+            offer_leads.add(lead.id)
         if sale_day:
             by_day[sale_day.isoformat()] += amount
         sale_items.append(
@@ -183,7 +261,7 @@ def build_revenue(
                 "category_label": categories.get(cat_id, cat_id),
                 "sehir": lead.sehir,
                 "satis_tutari": amount,
-                "satis_tarihi": lead.satis_tarihi or (sale_day.isoformat() if sale_day else ""),
+                "satis_tarihi": sale_day.isoformat() if sale_day else (lead.satis_tarihi or ""),
                 "teklif": lead.teklif,
             }
         )

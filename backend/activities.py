@@ -239,13 +239,15 @@ def activities_for_lead_update(old: Lead, data: dict) -> list[dict]:
 
     old_amount = float(old.satis_tutari or 0)
     new_amount = float(data.get("satis_tutari") or 0)
-    if new_amount > 0 and new_amount != old_amount:
+    increment = round(new_amount - old_amount, 2)
+    if increment > 0:
+        increment_label = f"{increment:,.0f} TL".replace(",", ".")
+        total_label = f"{new_amount:,.0f} TL".replace(",", ".")
         items.append(
             {
                 "activity_type": "satis_kaydedildi",
                 "title": "Ödeme kaydedildi" if old_amount == 0 else "Alınan miktar güncellendi",
-                "description": f"{new_amount:,.0f} TL".replace(",", "."),
-                "activity_date": _parse_date(data.get("satis_tarihi", "")),
+                "description": f"{increment_label} alındı (toplam {total_label})",
             }
         )
 

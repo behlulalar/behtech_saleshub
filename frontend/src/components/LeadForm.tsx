@@ -197,9 +197,6 @@ export default function LeadForm({ lead, tags, onSave, onClose }: Props) {
                         : prev.durum === 'Demo Gönderildi'
                           ? ''
                           : prev.demo_tarihi,
-                      satis_tarihi: newDurum === 'Müşteri'
-                        ? prev.satis_tarihi || new Date().toISOString().slice(0, 10)
-                        : prev.satis_tarihi,
                     }));
                   }}
                 />
@@ -369,7 +366,7 @@ export default function LeadForm({ lead, tags, onSave, onClose }: Props) {
                   placeholder="Örn. 4500"
                 />
                 <p className="mt-1 text-[11px] text-surface-800/50">
-                  Kasaya geçen ödeme. Tekliften ayrıdır; gelir istatistiklerinde bu tutar görünür.
+                  Kasaya geçen ödeme, kaydedildiği ayda gelir istatistiklerine yazılır. Teklif tarihi kullanılmaz.
                 </p>
               </Field>
               <Field label="Ödeme tarihi" icon={Calendar}>
@@ -379,6 +376,9 @@ export default function LeadForm({ lead, tags, onSave, onClose }: Props) {
                   value={form.satis_tarihi}
                   onChange={(e) => update('satis_tarihi', e.target.value)}
                 />
+                <p className="mt-1 text-[11px] text-surface-800/50">
+                  İlk tahsilat tarihi. Sonraki ödemeler eklendiği günün ayında görünür.
+                </p>
               </Field>
               <Field label="Sonuç">
                 <input

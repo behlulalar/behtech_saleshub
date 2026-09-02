@@ -32,6 +32,7 @@ from ai.router import router as ai_router
 from intelligence.router import router as intelligence_router
 from intelligence.business_events import LEAD_CREATED, OFFER_SENT, TASK_COMPLETED, emit_business_event, emit_stage_change_if_needed
 from logging_config import log_event, setup_logging
+from app_timezone import local_today
 from email_service import generate_reset_token, hash_token, send_password_reset_email, send_verification_email
 from lead_automation import apply_lead_automation
 from lead_import import (
@@ -1388,7 +1389,7 @@ def add_lead_payment(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Geçersiz ödeme tarihi") from exc
     else:
-        paid_at = date.today().isoformat()
+        paid_at = local_today().isoformat()
 
     old_amount = float(lead.satis_tutari or 0)
     new_amount = round(old_amount + increment, 2)
