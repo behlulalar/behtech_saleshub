@@ -1084,7 +1084,7 @@ export const ACTIVITY_TYPE_OPTIONS: ActivityType[] = [
   { id: 'gorusme_yapildi', label: 'Görüşme yapıldı' },
   { id: 'takip_yapildi', label: 'Takip yapıldı' },
   { id: 'durum_degisti', label: 'Durum değişti' },
-  { id: 'satis_kaydedildi', label: 'Satış kaydedildi' },
+  { id: 'satis_kaydedildi', label: 'Ödeme kaydedildi' },
   { id: 'kayit_olusturuldu', label: 'Kayıt oluşturuldu' },
   { id: 'diger', label: 'Diğer' },
 ];

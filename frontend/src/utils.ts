@@ -6,6 +6,14 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Teklif metninden tutar çıkarır: "8500 TL", "8.500", "8,500 TL". */
+export function parseOfferAmount(teklif: string): number | null {
+  const digits = (teklif || '').replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function toInstagramUrl(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

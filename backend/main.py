@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import logging
 import time
 from typing import Optional
@@ -120,6 +120,7 @@ from schemas import (
     LeadDiscoveryRequest,
     LeadDiscoveryResponse,
     PlacesUsageResponse,
+    LeadPaymentCreate,
     LeadResponse,
     LeadUpdate,
     LoginRequest,
@@ -1358,6 +1359,52 @@ def update_lead(
     new_durum = update_data.get("durum", lead.durum)
     emit_stage_change_if_needed(db, user.id, lead_id, old_durum, new_durum)
 
+    db.commit()
+    db.refresh(lead)
+    return lead_response(db, user.id, lead)
+
+
+@app.post("/api/leads/{lead_id}/payments", response_model=LeadResponse, status_code=200)
+def add_lead_payment(
+    lead_id: int,
+    data: LeadPaymentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_owner),
+):
+    """Tekliften bağımsız alınan tutarı kasaya ekler; gelir istatistiklerinde görünür."""
+    lead = get_lead_or_404(db, user.id, lead_id)
+    increment = round(float(data.amount), 2)
+    paid_at = (data.paid_at or "").strip()
+    if paid_at:
+        try:
+            datetime.strptime(paid_at[:10], "%Y-%m-%d")
+            paid_at = paid_at[:10]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Geçersiz ödeme tarihi") from exc
+    else:
+        paid_at = date.today().isoformat()
+
+    old_amount = float(lead.satis_tutari or 0)
+    new_amount = round(old_amount + increment, 2)
+    lead.satis_tutari = new_amount
+    if not (lead.satis_tarihi or "").strip():
+        lead.satis_tarihi = paid_at
+
+    increment_label = f"{increment:,.0f} TL".replace(",", ".")
+    total_label = f"{new_amount:,.0f} TL".replace(",", ".")
+    try:
+        paid_dt = datetime.strptime(paid_at, "%Y-%m-%d")
+    except ValueError:
+        paid_dt = datetime.utcnow()
+    log_activity(
+        db,
+        user_id=user.id,
+        lead_id=lead_id,
+        activity_type="satis_kaydedildi",
+        title="Ödeme kaydedildi",
+        description=f"{increment_label} alındı (toplam {total_label})",
+        activity_date=paid_dt,
+    )
     db.commit()
     db.refresh(lead)
     return lead_response(db, user.id, lead)

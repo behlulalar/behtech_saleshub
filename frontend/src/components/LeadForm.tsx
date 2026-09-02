@@ -355,7 +355,29 @@ export default function LeadForm({ lead, tags, onSave, onClose }: Props) {
                   className="input-field"
                   value={form.teklif}
                   onChange={(e) => update('teklif', e.target.value)}
-                  placeholder="Teklif detayı"
+                  placeholder="Örn. 8500 TL"
+                />
+              </Field>
+              <Field label="Alınan miktar (TL)" icon={CircleDollarSign}>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input-field"
+                  value={form.satis_tutari || ''}
+                  onChange={(e) => update('satis_tutari', Number(e.target.value) || 0)}
+                  placeholder="Örn. 4500"
+                />
+                <p className="mt-1 text-[11px] text-surface-800/50">
+                  Kasaya geçen ödeme. Tekliften ayrıdır; gelir istatistiklerinde bu tutar görünür.
+                </p>
+              </Field>
+              <Field label="Ödeme tarihi" icon={Calendar}>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={form.satis_tarihi}
+                  onChange={(e) => update('satis_tarihi', e.target.value)}
                 />
               </Field>
               <Field label="Sonuç">
@@ -366,29 +388,6 @@ export default function LeadForm({ lead, tags, onSave, onClose }: Props) {
                   placeholder="Sonuç"
                 />
               </Field>
-              {(form.durum === 'Müşteri' || form.satis_tutari > 0) && (
-                <>
-                  <Field label="Satış Tutarı (TL)" icon={CircleDollarSign}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      className="input-field"
-                      value={form.satis_tutari || ''}
-                      onChange={(e) => update('satis_tutari', Number(e.target.value) || 0)}
-                      placeholder="Örn. 8500"
-                    />
-                  </Field>
-                  <Field label="Satış Tarihi" icon={Calendar}>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={form.satis_tarihi}
-                      onChange={(e) => update('satis_tarihi', e.target.value)}
-                    />
-                  </Field>
-                </>
-              )}
               <div className="flex items-center gap-3 sm:col-span-2">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input

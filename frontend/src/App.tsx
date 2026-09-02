@@ -628,6 +628,16 @@ function App() {
     }
   };
 
+  const handleAddLeadPayment = async (amount: number) => {
+    if (!viewingLead) return;
+    const updated = await api.addLeadPayment(viewingLead.id, amount);
+    setViewingLead(updated);
+    setLeads((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    if (isOwner && isCompanyAccount) {
+      loadRevenue().catch(console.error);
+    }
+  };
+
   const handleAddTask = (type?: TaskType, date?: string) => {
     setQuickTaskDefaults({ type, date });
     setShowQuickTask(true);
@@ -1118,6 +1128,7 @@ function App() {
           senderUsername={userProfile?.username}
           onEdit={() => handleOpenEdit(viewingLead)}
           onClose={() => setViewingLead(null)}
+          onAddPayment={isOwner ? handleAddLeadPayment : undefined}
           readOnly={!isOwner}
         />
       )}

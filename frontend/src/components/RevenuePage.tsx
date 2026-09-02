@@ -199,14 +199,15 @@ export default function RevenuePage({ data, loading }: Props) {
           </p>
         ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-100 bg-surface-50/80 text-xs uppercase tracking-wide text-surface-800/50">
                   <th className="px-4 py-2.5 font-medium">{r.business}</th>
                   <th className="px-4 py-2.5 font-medium">{r.category}</th>
                   <th className="px-4 py-2.5 font-medium">{r.city}</th>
+                  <th className="px-4 py-2.5 font-medium">{r.offer}</th>
                   <th className="px-4 py-2.5 font-medium">{r.date}</th>
-                  <th className="px-4 py-2.5 text-right font-medium">{r.amount}</th>
+                  <th className="px-4 py-2.5 text-right font-medium">{r.received}</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,6 +216,7 @@ export default function RevenuePage({ data, loading }: Props) {
                     <td className="px-4 py-2.5 font-medium text-surface-900">{sale.isletme_adi}</td>
                     <td className="px-4 py-2.5 text-surface-800/70">{sale.category_label}</td>
                     <td className="px-4 py-2.5 text-surface-800/70">{sale.sehir || '—'}</td>
+                    <td className="px-4 py-2.5 text-surface-800/70">{sale.teklif || '—'}</td>
                     <td className="px-4 py-2.5 text-surface-800/70">{formatSaleDate(sale.satis_tarihi, locale)}</td>
                     <td className="px-4 py-2.5 text-right font-semibold text-emerald-700">
                       {formatCurrency(sale.satis_tutari)}

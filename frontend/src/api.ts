@@ -402,6 +402,12 @@ export const api = {
 
   getLead: (id: number) => request<Lead>(`/leads/${id}`),
 
+  addLeadPayment: (id: number, amount: number, paidAt?: string) =>
+    request<Lead>(`/leads/${id}/payments`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, paid_at: paidAt || '' }),
+    }),
+
   createLead: (category: string, data: LeadFormData) =>
     request<Lead>('/leads', {
       method: 'POST',

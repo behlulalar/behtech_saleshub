@@ -9,11 +9,12 @@ import {
   FileText,
   Instagram,
   Phone,
+  Plus,
   User,
   X,
 } from 'lucide-react';
 import type { Lead, UserRole } from '../types';
-import { formatCurrency, toInstagramUrl } from '../utils';
+import { formatCurrency, parseOfferAmount, toInstagramUrl } from '../utils';
 import LeadCommunicationPanel from './LeadCommunicationPanel';
 import AiLeadSummary from './ai/AiLeadSummary';
 import ActivityHistory from './ActivityHistory';
@@ -30,6 +31,7 @@ interface Props {
   senderUsername?: string;
   onEdit: () => void;
   onClose: () => void;
+  onAddPayment?: (amount: number) => Promise<void>;
   readOnly?: boolean;
 }
 
@@ -64,10 +66,36 @@ export default function LeadDetail({
   senderUsername,
   onEdit,
   onClose,
+  onAddPayment,
   readOnly = false,
 }: Props) {
   const [tab, setTab] = useState<'bilgiler' | 'aktiviteler' | 'dosyalar'>('bilgiler');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
   const instagramUrl = lead.instagram ? toInstagramUrl(lead.instagram) : null;
+  const offerAmount = parseOfferAmount(lead.teklif);
+  const received = Number(lead.satis_tutari || 0);
+  const remaining = offerAmount != null ? Math.max(offerAmount - received, 0) : null;
+
+  async function handleAddPayment() {
+    if (!onAddPayment) return;
+    const n = Number(String(paymentAmount).replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0) {
+      setPaymentError('Geçerli bir tutar girin');
+      return;
+    }
+    setPaymentSaving(true);
+    setPaymentError('');
+    try {
+      await onAddPayment(n);
+      setPaymentAmount('');
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Ödeme kaydedilemedi');
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
 
   return (
     <div className="modal-overlay">
@@ -208,19 +236,62 @@ export default function LeadDetail({
                   />
                   {!readOnly && <DetailItem label="Teklif" value={lead.teklif} />}
                   <DetailItem label="Sonuç" value={lead.sonuc} />
-                  {(lead.satis_tutari > 0 || lead.durum === 'Müşteri') && !readOnly && (
-                    <>
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-surface-800/45">
-                          Satış Tutarı
+                  {!readOnly && (
+                    <div className="sm:col-span-2 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-surface-800/45">
+                        Alınan miktar
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-emerald-700">
+                        <CircleDollarSign size={14} />
+                        {received > 0 ? formatCurrency(received) : 'Henüz ödeme yok'}
+                      </p>
+                      {remaining != null && offerAmount != null && received > 0 && (
+                        <p className="mt-1 text-xs text-surface-800/60">
+                          Teklif {formatCurrency(offerAmount)}
+                          {remaining > 0
+                            ? ` · kalan ${formatCurrency(remaining)}`
+                            : ' · teklif tamamen alındı'}
                         </p>
-                        <p className="mt-0.5 flex items-center gap-1 text-sm font-semibold text-emerald-700">
-                          <CircleDollarSign size={14} />
-                          {lead.satis_tutari > 0 ? formatCurrency(lead.satis_tutari) : '—'}
+                      )}
+                      {lead.satis_tarihi ? (
+                        <p className="mt-0.5 text-xs text-surface-800/50">İlk ödeme: {lead.satis_tarihi}</p>
+                      ) : null}
+                      {onAddPayment ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="input-field max-w-[160px]"
+                            value={paymentAmount}
+                            onChange={(e) => setPaymentAmount(e.target.value)}
+                            placeholder="Örn. 4500"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void handleAddPayment();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            disabled={paymentSaving}
+                            onClick={() => void handleAddPayment()}
+                          >
+                            <Plus size={16} />
+                            {paymentSaving ? 'Ekleniyor…' : 'Ekle'}
+                          </button>
+                        </div>
+                      ) : null}
+                      {paymentError ? (
+                        <p className="mt-2 text-xs text-red-600">{paymentError}</p>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-surface-800/50">
+                          Kapora veya kısmi ödeme ekleyin. Bu tutar Gelir İstatistikleri’nde görünür; teklif değişmez.
                         </p>
-                      </div>
-                      <DetailItem label="Satış Tarihi" value={lead.satis_tarihi} />
-                    </>
+                      )}
+                    </div>
                   )}
                 </div>
               </section>

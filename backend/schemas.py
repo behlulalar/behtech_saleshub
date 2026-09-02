@@ -227,6 +227,11 @@ class LeadUpdate(LeadBase):
     tag_ids: list[str] = Field(default_factory=list)
 
 
+class LeadPaymentCreate(BaseModel):
+    amount: float = Field(..., gt=0, le=99_999_999)
+    paid_at: str = ""
+
+
 class LeadResponse(LeadBase):
     id: int
     category: str

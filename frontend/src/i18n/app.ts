@@ -642,6 +642,8 @@ export interface AppCopy {
     city: string;
     amount: string;
     date: string;
+    offer: string;
+    received: string;
   };
 }
 
@@ -1396,6 +1398,8 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       city: 'Şehir',
       amount: 'Tutar',
       date: 'Tarih',
+      offer: 'Teklif',
+      received: 'Alınan',
     },
   },
   en: {
@@ -2143,6 +2147,8 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       city: 'City',
       amount: 'Amount',
       date: 'Date',
+      offer: 'Offer',
+      received: 'Received',
     },
   },
 };

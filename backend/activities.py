@@ -14,7 +14,7 @@ ACTIVITY_TYPES: dict[str, str] = {
     "gorusme_yapildi": "Görüşme yapıldı",
     "takip_yapildi": "Takip yapıldı",
     "durum_degisti": "Durum değişti",
-    "satis_kaydedildi": "Satış kaydedildi",
+    "satis_kaydedildi": "Ödeme kaydedildi",
     "kayit_olusturuldu": "Kayıt oluşturuldu",
     "diger": "Diğer",
 }
@@ -243,7 +243,7 @@ def activities_for_lead_update(old: Lead, data: dict) -> list[dict]:
         items.append(
             {
                 "activity_type": "satis_kaydedildi",
-                "title": "Satış kaydedildi" if old_amount == 0 else "Satış tutarı güncellendi",
+                "title": "Ödeme kaydedildi" if old_amount == 0 else "Alınan miktar güncellendi",
                 "description": f"{new_amount:,.0f} TL".replace(",", "."),
                 "activity_date": _parse_date(data.get("satis_tarihi", "")),
             }

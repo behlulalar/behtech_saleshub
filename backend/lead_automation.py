@@ -28,4 +28,9 @@ def apply_lead_automation(data: dict, existing: Lead | None = None) -> dict:
         if durum in DEMO_EARLY_STATUSES:
             result["durum"] = "Demo Gönderildi"
 
+    amount = float(result.get("satis_tutari") or 0)
+    if amount > 0 and not (result.get("satis_tarihi") or "").strip():
+        existing_date = (existing.satis_tarihi or "").strip() if existing is not None else ""
+        result["satis_tarihi"] = existing_date or date.today().isoformat()
+
     return result
