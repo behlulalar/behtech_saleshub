@@ -60,7 +60,6 @@ import type {
   LeadFormData,
   LeadRequest,
   LeadRequestFormData,
-  RevenueData,
   ReportData,
   ReportPeriod,
   IntelligenceView,
@@ -118,8 +117,6 @@ function App() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [revenue, setRevenue] = useState<RevenueData | null>(null);
-  const [revenueLoading, setRevenueLoading] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('weekly');
@@ -324,17 +321,6 @@ function App() {
     }
   }, [isOwner, isCompanyAccount]);
 
-  const loadRevenue = useCallback(async () => {
-    setRevenueLoading(true);
-    try {
-      setRevenue(await api.getRevenue());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setRevenueLoading(false);
-    }
-  }, []);
-
   const loadReports = useCallback(
     async (
       period: ReportPeriod = reportPeriod,
@@ -411,7 +397,6 @@ function App() {
       if (isCompanyAccount) await loadPendingCount();
     }
     if (isAnalyticsView(activeView)) await loadAnalytics();
-    if (activeView === 'gelir' && isOwner && isCompanyAccount) await loadRevenue();
     if (activeView === 'talepler' && isCompanyAccount) await loadRequests();
     if (activeView === 'raporlar' && isOwner) await loadReports();
     if (isCategoryView(activeView, categories)) await loadData();
@@ -424,7 +409,6 @@ function App() {
     loadTags,
     loadDashboard,
     loadAnalytics,
-    loadRevenue,
     loadData,
     loadPendingCount,
     loadRequests,
@@ -483,8 +467,7 @@ function App() {
       loadDashboard().catch(console.error);
       return;
     }
-    if (activeView === 'gelir' && isOwner && isCompanyAccount) {
-      loadRevenue().catch(console.error);
+    if (activeView === 'gelir') {
       return;
     }
     if (activeView === 'talepler' && isCompanyAccount) {
@@ -511,7 +494,6 @@ function App() {
     isCompanyAccount,
     loadData,
     loadDashboard,
-    loadRevenue,
     loadAnalytics,
     loadRequests,
     loadReports,
@@ -633,9 +615,6 @@ function App() {
     const updated = await api.addLeadPayment(viewingLead.id, amount);
     setViewingLead(updated);
     setLeads((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    if (isOwner && isCompanyAccount) {
-      loadRevenue().catch(console.error);
-    }
   };
 
   const handleAddTask = (type?: TaskType, date?: string) => {
@@ -1067,7 +1046,7 @@ function App() {
             </div>
           ) : isRevenue ? (
             <div className="mobile-scroll-pane h-full lg:overflow-y-auto">
-              <RevenuePage data={revenue} loading={revenueLoading} />
+              <RevenuePage />
             </div>
           ) : analyticsView ? (
             <div className="mobile-scroll-pane h-full lg:overflow-y-auto">

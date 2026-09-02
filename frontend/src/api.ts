@@ -307,7 +307,13 @@ export const api = {
     return request<DailyContactAnalytics>(`/analytics/daily-contact${params}`);
   },
 
-  getRevenue: () => request<RevenueData>('/revenue'),
+  getRevenue: (params?: { year?: number; month?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.year) search.set('year', String(params.year));
+    if (params?.month) search.set('month', String(params.month));
+    const qs = search.toString();
+    return request<RevenueData>(`/revenue${qs ? `?${qs}` : ''}`);
+  },
 
   getWeeklyReport: (date?: string) =>
     request<ReportData>(`/reports/weekly${date ? `?date=${encodeURIComponent(date)}` : ''}`),

@@ -563,6 +563,12 @@ class RevenueMonthItem(BaseModel):
     gelir: float
 
 
+class RevenueDayItem(BaseModel):
+    gun: str
+    gun_label: str
+    gelir: float
+
+
 class RevenueSaleItem(BaseModel):
     id: int
     isletme_adi: str
@@ -575,14 +581,24 @@ class RevenueSaleItem(BaseModel):
 
 
 class RevenueResponse(BaseModel):
+    year: int | None = None
+    month: int | None = None
+    period_label: str = ""
+    available_years: list[int] = []
     toplam_gelir: float
+    tum_zamanlar_gelir: float = 0
     bu_ay_gelir: float
     bu_yil_gelir: float
+    onceki_donem_gelir: float | None = None
+    degisim_yuzde: float | None = None
     ortalama_satis: float
     satis_sayisi: int
     musteri_sayisi: int
+    teklif_toplami: float = 0
+    kalan_toplam: float = 0
     kategori_dagilimi: list[RevenueCategoryItem]
     aylik_gelir: list[RevenueMonthItem]
+    gunluk_gelir: list[RevenueDayItem] = []
     son_satislar: list[RevenueSaleItem]
 
 

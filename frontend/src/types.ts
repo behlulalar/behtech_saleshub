@@ -272,6 +272,12 @@ export interface RevenueMonthItem {
   gelir: number;
 }
 
+export interface RevenueDayItem {
+  gun: string;
+  gun_label: string;
+  gelir: number;
+}
+
 export interface RevenueSaleItem {
   id: number;
   isletme_adi: string;
@@ -284,14 +290,24 @@ export interface RevenueSaleItem {
 }
 
 export interface RevenueData {
+  year?: number | null;
+  month?: number | null;
+  period_label: string;
+  available_years: number[];
   toplam_gelir: number;
+  tum_zamanlar_gelir: number;
   bu_ay_gelir: number;
   bu_yil_gelir: number;
+  onceki_donem_gelir: number | null;
+  degisim_yuzde: number | null;
   ortalama_satis: number;
   satis_sayisi: number;
   musteri_sayisi: number;
+  teklif_toplami: number;
+  kalan_toplam: number;
   kategori_dagilimi: RevenueCategoryItem[];
   aylik_gelir: RevenueMonthItem[];
+  gunluk_gelir: RevenueDayItem[];
   son_satislar: RevenueSaleItem[];
 }
 

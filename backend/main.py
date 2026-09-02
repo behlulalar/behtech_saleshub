@@ -748,8 +748,13 @@ def get_daily_contact_analytics(
 
 
 @app.get("/api/revenue", response_model=RevenueResponse)
-def get_revenue(db: Session = Depends(get_db), user: User = Depends(require_company_account)):
-    return build_revenue(db, user.id)
+def get_revenue(
+    year: Optional[int] = Query(default=None, ge=2000, le=2100),
+    month: Optional[int] = Query(default=None, ge=1, le=12),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_company_account),
+):
+    return build_revenue(db, user.id, year=year, month=month)
 
 
 def _report_includes_revenue(user: User) -> bool:

@@ -625,12 +625,16 @@ export interface AppCopy {
   revenue: {
     loading: string;
     notFound: string;
+    loadFailed: string;
+    retry: string;
     totalRevenue: string;
     thisMonth: string;
     thisYear: string;
+    allTime: string;
     avgSale: string;
     salesCount: string;
     monthlyRevenue: string;
+    dailyRevenue: string;
     noSalesYet: string;
     categoryRevenue: string;
     noCategorySales: string;
@@ -644,6 +648,16 @@ export interface AppCopy {
     date: string;
     offer: string;
     received: string;
+    remaining: string;
+    year: string;
+    month: string;
+    allMonths: string;
+    previous: string;
+    next: string;
+    vsPrevious: string;
+    emptyHint: string;
+    payments: string;
+    offered: string;
   };
 }
 
@@ -742,7 +756,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       },
       revenue: {
         title: 'Gelir İstatistikleri',
-        description: 'Satışlardan elde ettiğiniz gelir özeti',
+        description: 'Ay ve yıla göre alınan ödemeler, teklif karşılaştırması ve kategori dağılımı',
       },
       reports: {
         title: 'Raporlama',
@@ -1381,18 +1395,22 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
     revenue: {
       loading: 'Gelir verileri yükleniyor...',
       notFound: 'Gelir verisi bulunamadı.',
-      totalRevenue: 'Toplam Gelir',
-      thisMonth: 'Bu Ay',
-      thisYear: 'Bu Yıl',
-      avgSale: 'Ortalama Satış',
-      salesCount: 'Satış Sayısı',
-      monthlyRevenue: 'Aylık Gelir (Son 12 Ay)',
-      noSalesYet: 'Henüz kayıtlı satış geliri yok.',
-      categoryRevenue: 'Kategori Bazlı Gelir',
-      noCategorySales: 'Kategori bazlı satış verisi yok.',
-      sales: 'satış',
-      recentSales: 'Son Satışlar',
-      noRecentSales: 'Henüz satış kaydı yok.',
+      loadFailed: 'Gelir verileri yüklenemedi.',
+      retry: 'Tekrar dene',
+      totalRevenue: 'Alınan tutar',
+      thisMonth: 'Bu ay',
+      thisYear: 'Bu yıl',
+      allTime: 'Tüm zamanlar',
+      avgSale: 'Ortalama ödeme',
+      salesCount: 'Ödeme kaydı',
+      monthlyRevenue: 'Aylık gelir',
+      dailyRevenue: 'Günlük gelir',
+      noSalesYet: 'Bu dönemde kayıtlı ödeme yok.',
+      categoryRevenue: 'Kategori dağılımı',
+      noCategorySales: 'Bu dönemde kategori geliri yok.',
+      sales: 'ödeme',
+      recentSales: 'Ödemeler',
+      noRecentSales: 'Bu dönemde ödeme kaydı yok.',
       business: 'İşletme',
       category: 'Kategori',
       city: 'Şehir',
@@ -1400,6 +1418,16 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       date: 'Tarih',
       offer: 'Teklif',
       received: 'Alınan',
+      remaining: 'Kalan',
+      year: 'Yıl',
+      month: 'Ay',
+      allMonths: 'Tüm yıl',
+      previous: 'Önceki dönem',
+      next: 'Sonraki dönem',
+      vsPrevious: 'önceki döneme göre',
+      emptyHint: 'Müşteri kartından “Alınan miktar” eklediğiniz tutarlar burada görünür.',
+      payments: 'ödeme',
+      offered: 'Teklif toplamı',
     },
   },
   en: {
@@ -1496,7 +1524,7 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       },
       revenue: {
         title: 'Revenue Insights',
-        description: 'Summary of revenue from closed deals',
+        description: 'Received payments by month and year, offer comparison and category split',
       },
       reports: {
         title: 'Reports',
@@ -2130,18 +2158,22 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
     revenue: {
       loading: 'Loading revenue data...',
       notFound: 'Revenue data not found.',
-      totalRevenue: 'Total Revenue',
-      thisMonth: 'This Month',
-      thisYear: 'This Year',
-      avgSale: 'Average Sale',
-      salesCount: 'Sales Count',
-      monthlyRevenue: 'Monthly Revenue (Last 12 Months)',
-      noSalesYet: 'No recorded sales revenue yet.',
-      categoryRevenue: 'Revenue by Category',
-      noCategorySales: 'No category sales data.',
-      sales: 'sales',
-      recentSales: 'Recent Sales',
-      noRecentSales: 'No sales records yet.',
+      loadFailed: 'Could not load revenue data.',
+      retry: 'Try again',
+      totalRevenue: 'Amount received',
+      thisMonth: 'This month',
+      thisYear: 'This year',
+      allTime: 'All time',
+      avgSale: 'Average payment',
+      salesCount: 'Payments',
+      monthlyRevenue: 'Monthly revenue',
+      dailyRevenue: 'Daily revenue',
+      noSalesYet: 'No recorded payments in this period.',
+      categoryRevenue: 'Revenue by category',
+      noCategorySales: 'No category revenue in this period.',
+      sales: 'payments',
+      recentSales: 'Payments',
+      noRecentSales: 'No payments in this period.',
       business: 'Business',
       category: 'Category',
       city: 'City',
@@ -2149,6 +2181,16 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       date: 'Date',
       offer: 'Offer',
       received: 'Received',
+      remaining: 'Remaining',
+      year: 'Year',
+      month: 'Month',
+      allMonths: 'Full year',
+      previous: 'Previous period',
+      next: 'Next period',
+      vsPrevious: 'vs previous period',
+      emptyHint: 'Amounts added as “Amount received” on a customer card appear here.',
+      payments: 'payments',
+      offered: 'Offer total',
     },
   },
 };
