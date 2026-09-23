@@ -21,3 +21,8 @@ dist/
 
 # Uploaded customer files (stored on server, never in git)
 backend/uploads/
+
+# Database dumps (may contain customer data / password hashes)
+deploy/backups/
+*.sql
+*.sql.gz

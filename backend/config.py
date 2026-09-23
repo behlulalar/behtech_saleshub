@@ -8,7 +8,9 @@ WEAK_SECRET_KEYS = frozenset({
 })
 
 WEAK_ADMIN_PASSWORDS = frozenset({
-    "MuhammeD''123",
+    "change-me-admin-password",
+    "degistirin-guclu-admin-sifresi",
+    "CHANGE_ME_strong_admin_password",
     "admin",
     "password",
     "12345678",
@@ -50,7 +52,7 @@ class Settings(BaseSettings):
 
     seed_admin_username: str = "behlul"
     seed_admin_email: str = "behlul@local.crm"
-    seed_admin_password: str = "MuhammeD''123"
+    seed_admin_password: str = "change-me-admin-password"
     followup_reminder_days: int = 3
     diagnosis_engine_enabled: bool = True
     meeting_reminder_days: int = 3
