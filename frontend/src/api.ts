@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, AssistantConversation, AssistantConversationDetailResponse, AssistantConversationListResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, AssistantConversation, AssistantConversationDetailResponse, AssistantConversationListResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadBulkUpdateData, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setIdleTimeoutMinutes, setRememberPreference, setToken } from './auth';
 
 const API_BASE = '/api';
@@ -533,6 +533,12 @@ export const api = {
     request<Lead>(`/leads/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  bulkUpdateLeads: (leadIds: number[], changes: LeadBulkUpdateData) =>
+    request<{ updated: number }>('/leads/bulk-update', {
+      method: 'POST',
+      body: JSON.stringify({ lead_ids: leadIds, ...changes }),
     }),
 
   deleteLead: (id: number) =>

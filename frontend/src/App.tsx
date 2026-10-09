@@ -57,6 +57,7 @@ import type {
   Employee,
   EmployeeFormData,
   Lead,
+  LeadBulkUpdateData,
   LeadFormData,
   LeadRequest,
   LeadRequestFormData,
@@ -632,6 +633,11 @@ function App() {
     await refreshAfterLeadChange();
   };
 
+  const handleBulkUpdateLeads = async (leadIds: number[], changes: LeadBulkUpdateData) => {
+    await api.bulkUpdateLeads(leadIds, changes);
+    await refreshAfterLeadChange();
+  };
+
   const handleDeleteLead = async (lead: Lead) => {
     const ok = await confirm({
       title: app.confirm.title,
@@ -1089,6 +1095,7 @@ function App() {
                 onView={handleViewLead}
                 onEdit={handleOpenEdit}
                 onDelete={handleDeleteLead}
+                onBulkUpdate={isOwner ? handleBulkUpdateLeads : undefined}
                 readOnly={!isOwner}
                 addButtonLabel={isOwner ? app.common.newLead : app.common.createRequest}
               />

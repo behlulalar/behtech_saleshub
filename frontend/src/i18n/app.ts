@@ -164,6 +164,16 @@ export interface AppCopy {
     nextPage: string;
     importExcel: string;
     filters: string;
+    selectAll: string;
+    selectLead: string;
+    bulkSelected: string;
+    bulkPriority: string;
+    bulkStatus: string;
+    bulkAddTag: string;
+    bulkRemoveTag: string;
+    bulkApply: string;
+    bulkClear: string;
+    bulkFailed: string;
   };
   dashboard: {
     loading: string;
@@ -902,6 +912,16 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       nextPage: 'Sonraki',
       importExcel: 'Excel',
       filters: 'Filtreler',
+      selectAll: 'Sayfadaki tüm kayıtları seç',
+      selectLead: 'Kaydı seç',
+      bulkSelected: '{count} kayıt seçildi',
+      bulkPriority: 'Öncelik değiştir',
+      bulkStatus: 'Durum değiştir',
+      bulkAddTag: 'Etiket ekle',
+      bulkRemoveTag: 'Etiket kaldır',
+      bulkApply: 'Uygula',
+      bulkClear: 'Seçimi temizle',
+      bulkFailed: 'Toplu güncelleme yapılamadı.',
     },
     dashboard: {
       loading: 'Dashboard yükleniyor...',
@@ -1670,6 +1690,16 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       nextPage: 'Next',
       importExcel: 'Excel',
       filters: 'Filters',
+      selectAll: 'Select all records on this page',
+      selectLead: 'Select record',
+      bulkSelected: '{count} selected',
+      bulkPriority: 'Change priority',
+      bulkStatus: 'Change status',
+      bulkAddTag: 'Add tag',
+      bulkRemoveTag: 'Remove tag',
+      bulkApply: 'Apply',
+      bulkClear: 'Clear selection',
+      bulkFailed: 'Bulk update failed.',
     },
     dashboard: {
       loading: 'Loading dashboard...',

@@ -227,6 +227,18 @@ class LeadUpdate(LeadBase):
     tag_ids: list[str] = Field(default_factory=list)
 
 
+class LeadBulkUpdate(BaseModel):
+    lead_ids: list[int] = Field(..., min_length=1, max_length=500)
+    oncelik: Optional[str] = None
+    durum: Optional[str] = None
+    add_tag_ids: list[str] = Field(default_factory=list)
+    remove_tag_ids: list[str] = Field(default_factory=list)
+
+
+class LeadBulkUpdateResponse(BaseModel):
+    updated: int
+
+
 class LeadPaymentCreate(BaseModel):
     amount: float = Field(..., gt=0, le=99_999_999)
     paid_at: str = ""

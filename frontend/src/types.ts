@@ -247,6 +247,13 @@ export interface LeadDiscoveryImportResult {
   lead_ids: number[];
 }
 
+export interface LeadBulkUpdateData {
+  oncelik?: string;
+  durum?: string;
+  add_tag_ids?: string[];
+  remove_tag_ids?: string[];
+}
+
 export type LeadFormData = Omit<Lead, 'id' | 'category' | 'created_at' | 'updated_at' | 'tags'> & {
   tag_ids: string[];
 };

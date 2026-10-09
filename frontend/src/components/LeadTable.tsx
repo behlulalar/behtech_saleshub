@@ -1,6 +1,6 @@
-import { Compass, Edit2, ExternalLink, FileSpreadsheet, Filter, Instagram, Mail, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react';
-import { useState, type MouseEvent } from 'react';
-import type { Lead, Tag } from '../types';
+import { Compass, Edit2, ExternalLink, FileSpreadsheet, Filter, Instagram, Mail, MessageCircle, Phone, Plus, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useState, type MouseEvent } from 'react';
+import type { Lead, LeadBulkUpdateData, Tag } from '../types';
 import { DURUM_STATUSES, ONCELIK_OPTIONS } from '../types';
 import { useLocale } from '../i18n/locale';
 import { toInstagramUrl, toMailtoUrl, toTelUrl, toWhatsAppUrl } from '../utils';
@@ -33,6 +33,7 @@ interface Props {
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
+  onBulkUpdate?: (leadIds: number[], changes: LeadBulkUpdateData) => Promise<void>;
   readOnly?: boolean;
   addButtonLabel?: string;
 }
@@ -110,6 +111,108 @@ function ContactQuickActions({
   );
 }
 
+function BulkActionBar({
+  count,
+  tags,
+  onApply,
+  onClear,
+}: {
+  count: number;
+  tags: Tag[];
+  onApply: (changes: LeadBulkUpdateData) => Promise<void>;
+  onClear: () => void;
+}) {
+  const { app } = useLocale();
+  const c = app.common;
+  const [oncelik, setOncelik] = useState('');
+  const [durum, setDurum] = useState('');
+  const [addTag, setAddTag] = useState('');
+  const [removeTag, setRemoveTag] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState('');
+  const hasChanges = Boolean(oncelik || durum || addTag || removeTag);
+
+  const apply = async () => {
+    const changes: LeadBulkUpdateData = {};
+    if (oncelik) changes.oncelik = oncelik;
+    if (durum) changes.durum = durum;
+    if (addTag) changes.add_tag_ids = [addTag];
+    if (removeTag) changes.remove_tag_ids = [removeTag];
+    setApplying(true);
+    setError('');
+    try {
+      await onApply(changes);
+      setOncelik('');
+      setDurum('');
+      setAddTag('');
+      setRemoveTag('');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : c.bulkFailed);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const select = 'input-field min-w-0 py-1.5 text-sm';
+
+  return (
+    <div className="shrink-0 border-b border-brand-200 bg-brand-50/60 px-3 py-2 max-lg:px-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-brand-700">
+          {c.bulkSelected.replace('{count}', String(count))}
+        </span>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <select className={select} value={oncelik} disabled={applying} onChange={(e) => setOncelik(e.target.value)}>
+            <option value="">{c.bulkPriority}</option>
+            {ONCELIK_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{app.priorities[option.value] ?? option.label}</option>
+            ))}
+          </select>
+          <select className={select} value={durum} disabled={applying} onChange={(e) => setDurum(e.target.value)}>
+            <option value="">{c.bulkStatus}</option>
+            {DURUM_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>{app.statuses[status.value] ?? status.label}</option>
+            ))}
+          </select>
+          <select className={select} value={addTag} disabled={applying} onChange={(e) => setAddTag(e.target.value)}>
+            <option value="">{c.bulkAddTag}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>{tag.label}</option>
+            ))}
+          </select>
+          <select className={select} value={removeTag} disabled={applying} onChange={(e) => setRemoveTag(e.target.value)}>
+            <option value="">{c.bulkRemoveTag}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>{tag.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={apply}
+            disabled={!hasChanges || applying}
+            className="btn-primary py-1.5 text-sm disabled:opacity-40"
+          >
+            {applying ? c.loading : c.bulkApply}
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={applying}
+            className="btn-secondary px-2.5 py-1.5 text-sm"
+            title={c.bulkClear}
+            aria-label={c.bulkClear}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+      {error ? <p className="mt-1.5 text-xs text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
 function ProcessSummary({ lead, hideOffer = false }: { lead: Lead; hideOffer?: boolean }) {
   const parts: string[] = [];
   if (lead.demo_gonderildi) parts.push(`Demo: ${lead.demo_tarihi || '✓'}`);
@@ -154,6 +257,7 @@ export default function LeadTable({
   onView,
   onEdit,
   onDelete,
+  onBulkUpdate,
   readOnly = false,
   addButtonLabel,
 }: Props) {
@@ -161,6 +265,38 @@ export default function LeadTable({
   const c = app.common;
   const discoverLabel = app.leadDiscovery.discoverLeads;
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const selectable = !readOnly && Boolean(onBulkUpdate);
+  const allSelected = leads.length > 0 && leads.every((lead) => selectedIds.has(lead.id));
+
+  // Liste değiştiğinde (sayfa, filtre, kategori, yenileme) seçim sıfırlanır; görünmeyen kayıtlar yanlışlıkla güncellenmez.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [leads]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(leads.map((lead) => lead.id)));
+  };
+
+  const selectBox = (lead: Lead, className = '') => (
+    <input
+      type="checkbox"
+      className={`h-4 w-4 cursor-pointer accent-brand-500 ${className}`}
+      checked={selectedIds.has(lead.id)}
+      aria-label={c.selectLead}
+      onClick={(e) => e.stopPropagation()}
+      onChange={() => toggleSelect(lead.id)}
+    />
+  );
   const activeFilterCount = [durumFilter, tagFilter, oncelikFilter, sehirFilter].filter(Boolean).length;
 
   const filterSelects = (
@@ -292,9 +428,28 @@ export default function LeadTable({
         </div>
       </div>
 
+      {selectable && selectedIds.size > 0 && onBulkUpdate ? (
+        <BulkActionBar
+          count={selectedIds.size}
+          tags={tags}
+          onApply={(changes) => onBulkUpdate([...selectedIds], changes)}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      ) : null}
+
       <div className="mobile-scroll-pane bg-white lg:hidden">
         {!loading && total > 0 ? (
-          <div className="sticky top-0 z-10 border-b border-surface-200 bg-surface-50 px-3.5 py-2 text-xs font-medium text-surface-800/70">
+          <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-surface-200 bg-surface-50 px-3.5 py-2 text-xs font-medium text-surface-800/70">
+            {selectable ? (
+              <input
+                type="checkbox"
+                className="h-4 w-4 cursor-pointer accent-brand-500"
+                checked={allSelected}
+                aria-label={c.selectAll}
+                title={c.selectAll}
+                onChange={toggleSelectAll}
+              />
+            ) : null}
             {app.stats.total}: {total}
           </div>
         ) : null}
@@ -314,6 +469,7 @@ export default function LeadTable({
                   className="cursor-pointer px-3.5 py-3 transition active:bg-brand-50/50"
                 >
                   <div className="flex items-start gap-2.5">
+                    {selectable ? selectBox(lead, 'mt-0.5 shrink-0') : null}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold leading-snug text-surface-900 line-clamp-2">
                         {lead.isletme_adi}
@@ -370,6 +526,19 @@ export default function LeadTable({
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 z-10 bg-surface-50 shadow-sm">
             <tr className="border-b border-surface-200 text-[11px] font-medium uppercase tracking-wide text-surface-800/50">
+              {selectable ? (
+                <th className="w-8 py-2 pl-3 pr-0">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer align-middle accent-brand-500"
+                    checked={allSelected}
+                    disabled={loading || leads.length === 0}
+                    aria-label={c.selectAll}
+                    title={c.selectAll}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              ) : null}
               <th className="px-3 py-2">{c.business}</th>
               <th className="hidden px-3 py-2 md:table-cell">{c.tag}</th>
               <th className="px-3 py-2">{c.priority}</th>
@@ -382,13 +551,13 @@ export default function LeadTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-surface-800/50">
+                <td colSpan={selectable ? 8 : 7} className="px-3 py-10 text-center text-surface-800/50">
                   {c.loading}
                 </td>
               </tr>
             ) : leads.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-surface-800/50">
+                <td colSpan={selectable ? 8 : 7} className="px-3 py-10 text-center text-surface-800/50">
                   {c.noRecords}
                 </td>
               </tr>
@@ -400,8 +569,13 @@ export default function LeadTable({
                   <tr
                     key={lead.id}
                     onClick={() => onView(lead)}
-                    className="cursor-pointer border-b border-surface-100 transition hover:bg-brand-50/40"
+                    className={`cursor-pointer border-b border-surface-100 transition hover:bg-brand-50/40 ${
+                      selectedIds.has(lead.id) ? 'bg-brand-50/60' : ''
+                    }`}
                   >
+                    {selectable ? (
+                      <td className="w-8 py-2 pl-3 pr-0 align-middle">{selectBox(lead, 'align-middle')}</td>
+                    ) : null}
                     <td className="max-w-[220px] px-3 py-2">
                       <p className="truncate font-medium text-surface-900" title={lead.isletme_adi}>
                         {lead.isletme_adi}

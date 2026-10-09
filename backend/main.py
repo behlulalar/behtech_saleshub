@@ -122,6 +122,8 @@ from schemas import (
     LeadDiscoveryRequest,
     LeadDiscoveryResponse,
     PlacesUsageResponse,
+    LeadBulkUpdate,
+    LeadBulkUpdateResponse,
     LeadPaymentCreate,
     LeadResponse,
     LeadUpdate,
@@ -157,7 +159,7 @@ from security import (
     validate_username,
     verify_password,
 )
-from tags import get_lead_tags, sync_lead_tags, tag_response, validate_tag_ids
+from tags import get_lead_tag_ids, get_lead_tags, sync_lead_tags, tag_response, validate_tag_ids
 from utils import slugify
 
 limiter = Limiter(key_func=get_remote_address)
@@ -194,6 +196,11 @@ VALID_TAG_COLORS = {
 }
 
 VALID_PRIORITIES = {"dusuk", "orta", "yuksek"}
+
+VALID_STATUSES = {
+    "Yeni", "İletişime Geçildi", "Takip Bekliyor", "Demo Gönderildi", "Görüşme Planlandı",
+    "Teklif Verildi", "Müşteri", "Olumsuz", "Cevap Yok",
+}
 
 PRIORITY_ORDER = case(
     (Lead.oncelik == "yuksek", 1),
@@ -1369,6 +1376,64 @@ def update_lead(
     db.commit()
     db.refresh(lead)
     return lead_response(db, user.id, lead)
+
+
+@app.post("/api/leads/bulk-update", response_model=LeadBulkUpdateResponse)
+def bulk_update_leads(
+    data: LeadBulkUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_owner),
+):
+    """Seçili kayıtlarda öncelik, durum ve etiketleri tek seferde günceller."""
+    if data.oncelik is not None and data.oncelik not in VALID_PRIORITIES:
+        raise HTTPException(status_code=400, detail="Geçersiz öncelik")
+    if data.durum is not None and data.durum not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail="Geçersiz durum")
+    add_tag_ids = list(dict.fromkeys(data.add_tag_ids))
+    remove_tag_ids = [t for t in dict.fromkeys(data.remove_tag_ids) if t not in add_tag_ids]
+    try:
+        validate_tag_ids(db, user.id, add_tag_ids + remove_tag_ids)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Geçersiz etiket seçimi")
+    if data.oncelik is None and data.durum is None and not add_tag_ids and not remove_tag_ids:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan seçilmedi")
+
+    lead_ids = list(dict.fromkeys(data.lead_ids))
+    leads = db.query(Lead).filter(Lead.user_id == user.id, Lead.id.in_(lead_ids)).all()
+    if len(leads) != len(lead_ids):
+        raise HTTPException(status_code=404, detail="Kayıt bulunamadı")
+
+    for lead in leads:
+        if data.oncelik is not None:
+            lead.oncelik = data.oncelik
+
+        if data.durum is not None:
+            old_durum = lead.durum
+            new_durum = apply_lead_automation({"durum": data.durum}, lead)["durum"]
+            if new_durum != old_durum:
+                record_activities(
+                    db,
+                    user.id,
+                    lead.id,
+                    [{
+                        "activity_type": "durum_degisti",
+                        "title": "Durum değişti",
+                        "description": f"{old_durum} → {new_durum}",
+                    }],
+                )
+                lead.durum = new_durum
+                emit_stage_change_if_needed(db, user.id, lead.id, old_durum, new_durum)
+
+        if add_tag_ids or remove_tag_ids:
+            current = get_lead_tag_ids(db, user.id, lead.id)
+            next_ids = [t for t in current if t not in remove_tag_ids]
+            next_ids += [t for t in add_tag_ids if t not in next_ids]
+            if next_ids != current:
+                sync_lead_tags(db, user.id, lead.id, next_ids)
+
+    db.commit()
+    log_event(logger, "leads_bulk_updated", user_id=user.id, count=len(leads))
+    return LeadBulkUpdateResponse(updated=len(leads))
 
 
 @app.post("/api/leads/{lead_id}/payments", response_model=LeadResponse, status_code=200)
