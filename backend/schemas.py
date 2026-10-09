@@ -319,6 +319,7 @@ class LeadDiscoveryResultItem(BaseModel):
     longitude: float | None = None
     already_in_crm: bool
     existing_lead_id: int | None = None
+    already_requested: bool = False
     low_digital_presence: bool = False
 
 
@@ -355,6 +356,11 @@ class LeadDiscoveryImportResponse(BaseModel):
     updated: int
     skipped: int
     lead_ids: list[int]
+
+
+class LeadDiscoveryRequestResponse(BaseModel):
+    created: int
+    skipped: int
 
 
 class PaginatedLeadResponse(BaseModel):

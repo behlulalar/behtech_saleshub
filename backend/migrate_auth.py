@@ -310,6 +310,25 @@ def run_migrations(db: Session) -> None:
         if "eposta" not in cols:
             db.execute(text("ALTER TABLE lead_requests ADD COLUMN eposta VARCHAR(255) DEFAULT ''"))
             db.commit()
+        request_discovery_columns = [
+            ("source", "VARCHAR(50) DEFAULT 'manual'"),
+            ("google_place_id", "VARCHAR(255)"),
+            ("latitude", "NUMERIC(10, 7)"),
+            ("longitude", "NUMERIC(10, 7)"),
+            ("google_rating", "NUMERIC(3, 2)"),
+            ("google_rating_count", "INTEGER"),
+        ]
+        for col_name, col_type in request_discovery_columns:
+            if col_name not in cols:
+                db.execute(text(f"ALTER TABLE lead_requests ADD COLUMN {col_name} {col_type}"))
+                db.commit()
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_lead_requests_google_place_id "
+                "ON lead_requests (google_place_id)"
+            )
+        )
+        db.commit()
 
     if "lead_activities" in tables:
         from activities import backfill_all_lead_activities, fix_future_gorusme_activities, fix_mesaj_activity_dates

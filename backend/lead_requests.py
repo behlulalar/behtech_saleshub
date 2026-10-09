@@ -110,6 +110,18 @@ def approve_lead_request(db: Session, owner: User, request_id: int) -> Lead:
     if request.status != "pending":
         raise HTTPException(status_code=400, detail="Talep zaten işlenmiş")
 
+    if request.google_place_id:
+        duplicate = (
+            db.query(Lead.id)
+            .filter(Lead.user_id == owner.id, Lead.google_place_id == request.google_place_id)
+            .first()
+        )
+        if duplicate:
+            raise HTTPException(
+                status_code=409,
+                detail="Bu işletme zaten müşteri listesinde. Talebi reddedebilirsiniz.",
+            )
+
     requester = db.query(User).filter(User.id == request.requested_by).first()
     tag_ids = _parse_tag_ids(request.tag_ids_json)
 
@@ -138,7 +150,16 @@ def approve_lead_request(db: Session, owner: User, request_id: int) -> Lead:
         }
     )
 
-    lead = Lead(user_id=owner.id, **lead_payload)
+    lead = Lead(
+        user_id=owner.id,
+        source=request.source or "manual",
+        google_place_id=request.google_place_id or None,
+        latitude=request.latitude,
+        longitude=request.longitude,
+        google_rating=request.google_rating,
+        google_rating_count=request.google_rating_count,
+        **lead_payload,
+    )
     db.add(lead)
     db.flush()
 

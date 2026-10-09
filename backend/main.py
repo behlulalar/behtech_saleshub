@@ -48,6 +48,7 @@ from lead_discovery import (
     discover_leads,
     get_usage_summary,
     import_discovered_leads,
+    request_discovered_leads,
 )
 from lead_attachments import (
     archive_attachment,
@@ -119,6 +120,7 @@ from schemas import (
     LeadImportResponse,
     LeadDiscoveryImportRequest,
     LeadDiscoveryImportResponse,
+    LeadDiscoveryRequestResponse,
     LeadDiscoveryRequest,
     LeadDiscoveryResponse,
     PlacesUsageResponse,
@@ -1170,32 +1172,40 @@ def create_lead(
 
 
 @app.get("/api/leads/discover/usage", response_model=PlacesUsageResponse)
-def get_lead_discovery_usage(db: Session = Depends(get_db), user: User = Depends(require_owner)):
-    return get_usage_summary(db, user.id)
+def get_lead_discovery_usage(db: Session = Depends(get_db), user: User = Depends(verify_token)):
+    return get_usage_summary(db, get_org_id(user))
 
 
 @app.post("/api/leads/discover", response_model=LeadDiscoveryResponse)
 def discover_leads_endpoint(
     data: LeadDiscoveryRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_owner),
+    user: User = Depends(verify_token),
 ):
+    # Kota şirket genelinde ortaktır; personel ücretli (kota aşımı) sorgu başlatamaz.
+    org_id = get_org_id(user)
+    is_employee = user.role == ROLE_EMPLOYEE
     category = data.category.strip() if data.category else None
     if category:
-        get_category_or_404(db, user.id, category)
+        get_category_or_404(db, org_id, category)
 
     try:
         result = discover_leads(
             db,
-            user.id,
+            org_id,
             city=data.city,
             district=data.district,
             sector_keyword=data.sector_keyword,
             category=category,
             radius_meters=data.radius_meters,
-            confirm_over_quota=data.confirm_over_quota,
+            confirm_over_quota=data.confirm_over_quota and not is_employee,
         )
     except QuotaExceededError as exc:
+        if is_employee:
+            raise HTTPException(
+                status_code=403,
+                detail="Bu ayın ücretsiz arama kotası doldu. Ek arama için yöneticinize başvurun.",
+            ) from exc
         raise HTTPException(
             status_code=402,
             detail={
@@ -1221,7 +1231,8 @@ def discover_leads_endpoint(
     log_event(
         logger,
         "leads_discovered",
-        user_id=user.id,
+        user_id=org_id,
+        actor_id=user.id,
         city=data.city.strip(),
         district=(data.district or "").strip(),
         sector=data.sector_keyword.strip(),
@@ -1233,6 +1244,39 @@ def discover_leads_endpoint(
         **result,
         "warning_message": warning_message,
     }
+
+
+@app.post("/api/leads/discover/request", response_model=LeadDiscoveryRequestResponse)
+def request_discovered_leads_endpoint(
+    data: LeadDiscoveryImportRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(verify_token),
+):
+    if user.role != ROLE_EMPLOYEE:
+        raise HTTPException(status_code=403, detail="Talep oluşturmak için personel hesabı gerekir")
+
+    org_id = get_org_id(user)
+    category = data.category.strip()
+    get_category_or_404(db, org_id, category)
+
+    result = request_discovered_leads(
+        db,
+        org_id,
+        user.id,
+        category=category,
+        places=[item.model_dump() for item in data.places],
+        city=data.city,
+    )
+    log_event(
+        logger,
+        "leads_discovery_requested",
+        user_id=org_id,
+        actor_id=user.id,
+        category=category,
+        created=result["created"],
+        skipped=result["skipped"],
+    )
+    return result
 
 
 @app.post("/api/leads/discover/import", response_model=LeadDiscoveryImportResponse)

@@ -288,6 +288,13 @@ class LeadRequest(Base):
     notlar = Column(Text, default="")
     tag_ids_json = Column(Text, default="[]")
 
+    source = Column(String(50), default="manual")
+    google_place_id = Column(String(255), nullable=True, index=True)
+    latitude = Column(Numeric(10, 7), nullable=True)
+    longitude = Column(Numeric(10, 7), nullable=True)
+    google_rating = Column(Numeric(3, 2), nullable=True)
+    google_rating_count = Column(Integer, nullable=True)
+
     rejection_note = Column(String(500), default="")
     reviewed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)

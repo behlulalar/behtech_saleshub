@@ -572,6 +572,11 @@ export interface AppCopy {
     importSelected: string;
     importing: string;
     importSuccess: string;
+    subtitleEmployee: string;
+    alreadyRequested: string;
+    requestSelected: string;
+    requesting: string;
+    requestSuccess: string;
     importFailed: string;
     discoverLeads: string;
   };
@@ -1338,6 +1343,11 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       importSelected: 'Seçilenleri Aktar ({count})',
       importing: 'Aktarılıyor...',
       importSuccess: '{created} eklendi, {updated} güncellendi',
+      subtitleEmployee: 'Google Places ile bölgedeki işletmeleri tarayın; seçtiklerinizi yönetici onayına talep olarak gönderin.',
+      alreadyRequested: 'Talep bekliyor',
+      requestSelected: 'Talep Gönder ({count})',
+      requesting: 'Gönderiliyor...',
+      requestSuccess: '{created} talep yönetici onayına gönderildi, {skipped} atlandı',
       importFailed: 'Aktarma başarısız',
       discoverLeads: 'Lead Keşfi',
     },
@@ -2111,6 +2121,11 @@ export const appCopy: Record<LandingLocale, AppCopy> = {
       importSelected: 'Import Selected ({count})',
       importing: 'Importing...',
       importSuccess: '{created} added, {updated} updated',
+      subtitleEmployee: 'Scan real businesses in an area with Google Places and send the ones you pick to your manager as lead requests.',
+      alreadyRequested: 'Request pending',
+      requestSelected: 'Send Requests ({count})',
+      requesting: 'Sending...',
+      requestSuccess: '{created} requests sent for approval, {skipped} skipped',
       importFailed: 'Import failed',
       discoverLeads: 'Lead Discovery',
     },

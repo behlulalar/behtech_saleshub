@@ -1,4 +1,4 @@
-import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, AssistantConversation, AssistantConversationDetailResponse, AssistantConversationListResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadBulkUpdateData, LeadDiscoveryImportResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
+import type { ActionProposalItem, Activity, ActivityFormData, AiActionExecuteResponse, AiActionItem, AiActionListResponse, AiChatRequest, AiChatResponse, AiRunCreateRequest, AiRunCreateResponse, AiRunDetail, AiRunListResponse, AiStatusResponse, AssistantConversation, AssistantConversationDetailResponse, AssistantConversationListResponse, CompanyProfile, AnalyticsData, Category, CategoryFormData, DashboardData, DeleteAccountData, DailyContactAnalytics, DiagnosisHistoryInterpretRequest, DiagnosisHistoryInterpretResponse, DiagnosisHistoryResponse, DiagnosisInterpretRequest, DiagnosisInterpretResponse, DiagnosisListResponse, DiagnosisSyncResponse, Employee, EmployeeFormData, FunnelData, Lead, LeadAttachment, LeadBulkUpdateData, LeadDiscoveryImportResult, LeadDiscoveryRequestResult, LeadDiscoveryResponse, LeadFormData, LeadImportBatch, LeadImportResult, LeadRequest, LeadRequestFormData, PaginatedLeads, PlacesUsage, PrioritiesResponse, ReportData, ReportPeriod, RevenueData, Stats, SuggestMessageRequest, SuggestMessageResponse, SummarizeLeadRequest, SummarizeLeadResponse, Tag, TagFormData, UpdateProfileData, UserProfile } from './types';
 import { clearSessionExpired, getToken, setIdleTimeoutMinutes, setRememberPreference, setToken } from './auth';
 
 const API_BASE = '/api';
@@ -162,6 +162,22 @@ export interface RegisterResponse {
   role?: 'owner' | 'employee';
   account_type?: 'individual' | 'company';
   expires_in?: number;
+}
+
+interface DiscoveredLeadsPayload {
+  category: string;
+  city: string;
+  places: Array<{
+    google_place_id: string;
+    business_name: string;
+    phone_number?: string;
+    address?: string;
+    rating?: number | null;
+    rating_count?: number | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    low_digital_presence?: boolean;
+  }>;
 }
 
 export const api = {
@@ -509,22 +525,14 @@ export const api = {
     return res.json() as Promise<LeadDiscoveryResponse>;
   },
 
-  importDiscoveredLeads: (payload: {
-    category: string;
-    city: string;
-    places: Array<{
-      google_place_id: string;
-      business_name: string;
-      phone_number?: string;
-      address?: string;
-      rating?: number | null;
-      rating_count?: number | null;
-      latitude?: number | null;
-      longitude?: number | null;
-      low_digital_presence?: boolean;
-    }>;
-  }) =>
+  importDiscoveredLeads: (payload: DiscoveredLeadsPayload) =>
     request<LeadDiscoveryImportResult>('/leads/discover/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  requestDiscoveredLeads: (payload: DiscoveredLeadsPayload) =>
+    request<LeadDiscoveryRequestResult>('/leads/discover/request', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

@@ -362,6 +362,16 @@ function SidebarPanel({
           </button>
         )}
 
+        {!isOwner && onSelectLeadDiscovery ? (
+          <button
+            onClick={go(onSelectLeadDiscovery)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-medium transition nav-inactive lg:text-sm"
+          >
+            <Compass size={18} />
+            {app.sidebar.leadDiscovery}
+          </button>
+        ) : null}
+
         <SidebarCollapsibleSection
           sectionId="categories"
           title={app.sidebar.categories}

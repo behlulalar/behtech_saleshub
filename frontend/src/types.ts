@@ -227,7 +227,13 @@ export interface LeadDiscoveryResult {
   longitude: number | null;
   already_in_crm: boolean;
   existing_lead_id: number | null;
+  already_requested: boolean;
   low_digital_presence: boolean;
+}
+
+export interface LeadDiscoveryRequestResult {
+  created: number;
+  skipped: number;
 }
 
 export interface LeadDiscoveryResponse {

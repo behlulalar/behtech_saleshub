@@ -899,7 +899,7 @@ function App() {
         }}
         onSelectRevenue={goToRevenue}
         onSelectReports={goToReports}
-        onSelectLeadDiscovery={isOwner ? () => setShowLeadDiscovery(true) : undefined}
+        onSelectLeadDiscovery={() => setShowLeadDiscovery(true)}
         onSelectRequests={goToRequests}
         onSelectAnalytics={goToAnalytics}
         onSelectIntelligence={goToIntelligence}
@@ -1091,7 +1091,7 @@ function App() {
                   }
                 }}
                 onImport={isOwner ? () => setShowLeadImport(true) : undefined}
-                onDiscover={isOwner ? () => setShowLeadDiscovery(true) : undefined}
+                onDiscover={() => setShowLeadDiscovery(true)}
                 onView={handleViewLead}
                 onEdit={handleOpenEdit}
                 onDelete={handleDeleteLead}
@@ -1191,8 +1191,9 @@ function App() {
         />
       )}
 
-      {showLeadDiscovery && isOwner && (
+      {showLeadDiscovery && (
         <LeadDiscoveryModal
+          requestMode={!isOwner}
           categories={categories}
           defaultCategoryId={isCategoryView(activeView, categories) ? activeView : categories[0]?.id || ''}
           onClose={() => setShowLeadDiscovery(false)}

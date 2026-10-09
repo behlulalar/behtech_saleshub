@@ -10,9 +10,11 @@ interface Props {
   defaultCategoryId: string;
   onClose: () => void;
   onSuccess: () => void;
+  /** Personel seçtiklerini doğrudan eklemez; yönetici onayına talep olarak gönderir. */
+  requestMode?: boolean;
 }
 
-export default function LeadDiscoveryModal({ categories, defaultCategoryId, onClose, onSuccess }: Props) {
+export default function LeadDiscoveryModal({ categories, defaultCategoryId, onClose, onSuccess, requestMode = false }: Props) {
   const { app } = useLocale();
   const t = app.leadDiscovery;
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
@@ -46,7 +48,7 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
   }, [loadUsage]);
 
   const importableResults = useMemo(
-    () => results.filter((item) => !item.already_in_crm),
+    () => results.filter((item) => !item.already_in_crm && !item.already_requested),
     [results],
   );
 
@@ -94,7 +96,11 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
       setMappedCategory(response.mapped_category);
       setUsage(response.usage);
       setSelectedIds(
-        new Set(response.results.filter((item) => !item.already_in_crm).map((item) => item.google_place_id)),
+        new Set(
+          response.results
+            .filter((item) => !item.already_in_crm && !item.already_requested)
+            .map((item) => item.google_place_id),
+        ),
       );
       if (response.warning_message) setWarningMessage(response.warning_message);
     } catch (err) {
@@ -119,7 +125,9 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
   };
 
   const handleImport = async () => {
-    const selected = results.filter((item) => selectedIds.has(item.google_place_id) && !item.already_in_crm);
+    const selected = results.filter(
+      (item) => selectedIds.has(item.google_place_id) && !item.already_in_crm && !item.already_requested,
+    );
     if (selected.length === 0) {
       setError(t.noSelection);
       return;
@@ -129,7 +137,7 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
     setNotice('');
     setImporting(true);
     try {
-      const response = await api.importDiscoveredLeads({
+      const payload = {
         category: mappedCategory || categoryId,
         city: city.trim(),
         places: selected.map((item) => ({
@@ -143,17 +151,29 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
           longitude: item.longitude,
           low_digital_presence: item.low_digital_presence,
         })),
-      });
-      setNotice(
-        t.importSuccess
-          .replace('{created}', String(response.created))
-          .replace('{updated}', String(response.updated)),
-      );
+      };
+      if (requestMode) {
+        const response = await api.requestDiscoveredLeads(payload);
+        setNotice(
+          t.requestSuccess
+            .replace('{created}', String(response.created))
+            .replace('{skipped}', String(response.skipped)),
+        );
+      } else {
+        const response = await api.importDiscoveredLeads(payload);
+        setNotice(
+          t.importSuccess
+            .replace('{created}', String(response.created))
+            .replace('{updated}', String(response.updated)),
+        );
+      }
       onSuccess();
       setResults((prev) =>
         prev.map((item) =>
           selectedIds.has(item.google_place_id)
-            ? { ...item, already_in_crm: true }
+            ? requestMode
+              ? { ...item, already_requested: true }
+              : { ...item, already_in_crm: true }
             : item,
         ),
       );
@@ -181,7 +201,7 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
                 <Compass size={18} className="text-brand-500" />
                 {t.title}
               </h2>
-              <p className="mt-1 text-sm text-surface-800/60">{t.subtitle}</p>
+              <p className="mt-1 text-sm text-surface-800/60">{requestMode ? t.subtitleEmployee : t.subtitle}</p>
               {usage ? (
                 <p className="mt-2 inline-flex rounded-full bg-surface-100 px-2.5 py-1 text-xs font-medium text-surface-800/70">
                   {usageLabel}
@@ -289,7 +309,7 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
                         type="checkbox"
                         className="mt-1"
                         checked={selectedIds.has(item.google_place_id)}
-                        disabled={item.already_in_crm || importing}
+                        disabled={item.already_in_crm || item.already_requested || importing}
                         onChange={() => toggleSelect(item.google_place_id)}
                       />
                       <div className="min-w-0 flex-1">
@@ -298,6 +318,10 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
                           {item.already_in_crm ? (
                             <span className="rounded-full bg-surface-100 px-2 py-0.5 text-[10px] font-semibold text-surface-700">
                               {t.alreadyAdded}
+                            </span>
+                          ) : item.already_requested ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                              {t.alreadyRequested}
                             </span>
                           ) : null}
                           {item.low_digital_presence ? (
@@ -334,7 +358,13 @@ export default function LeadDiscoveryModal({ categories, defaultCategoryId, onCl
               disabled={importing || scanning || selectedIds.size === 0}
               className="btn-primary"
             >
-              {importing ? t.importing : t.importSelected.replace('{count}', String(selectedIds.size))}
+              {requestMode
+                ? importing
+                  ? t.requesting
+                  : t.requestSelected.replace('{count}', String(selectedIds.size))
+                : importing
+                  ? t.importing
+                  : t.importSelected.replace('{count}', String(selectedIds.size))}
             </button>
           </div>
         </div>

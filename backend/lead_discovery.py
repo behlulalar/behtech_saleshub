@@ -20,8 +20,8 @@ from sqlalchemy.orm import Session
 
 from activities import activities_for_new_lead, record_activities
 from config import settings
-from text_format import normalize_business_name
-from database import ApiUsageLog, Lead, LeadDiscoveryScan
+from text_format import normalize_business_name, normalize_lead_text_fields
+from database import ApiUsageLog, Lead, LeadDiscoveryScan, LeadRequest
 from lead_automation import apply_lead_automation
 
 logger = logging.getLogger("behtech.discovery")
@@ -411,11 +411,25 @@ def existing_lead_index(db: Session, user_id: int) -> tuple[dict[str, Lead], dic
     return by_place, by_phone
 
 
+def pending_request_place_ids(db: Session, owner_id: int) -> set[str]:
+    rows = (
+        db.query(LeadRequest.google_place_id)
+        .filter(
+            LeadRequest.owner_id == owner_id,
+            LeadRequest.status == "pending",
+            LeadRequest.google_place_id.isnot(None),
+        )
+        .all()
+    )
+    return {row.google_place_id for row in rows if row.google_place_id}
+
+
 def enrich_result(
     place: dict[str, Any],
     *,
     by_place: dict[str, Lead],
     by_phone: dict[str, Lead],
+    requested_place_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     phone_norm = normalize_phone(place.get("phone_number"))
     existing = by_place.get(place["google_place_id"])
@@ -430,6 +444,7 @@ def enrich_result(
         "phone_normalized": phone_norm,
         "already_in_crm": existing is not None,
         "existing_lead_id": existing.id if existing else None,
+        "already_requested": place["google_place_id"] in (requested_place_ids or set()),
         "low_digital_presence": low_digital,
     }
 
@@ -504,8 +519,9 @@ def discover_leads(
     record_scan(db, user_id, city, district, sector_keyword)
 
     by_place, by_phone = existing_lead_index(db, user_id)
+    requested_place_ids = pending_request_place_ids(db, user_id)
     results = [
-        enrich_result(place, by_place=by_place, by_phone=by_phone)
+        enrich_result(place, by_place=by_place, by_phone=by_phone, requested_place_ids=requested_place_ids)
         for place in merged.values()
         if place.get("business_name")
     ]
@@ -534,6 +550,72 @@ def _discovery_notes(place: dict[str, Any], city: str) -> str:
     if place.get("low_digital_presence"):
         lines.append("Not: Düşük dijital varlık (az yorum — sıcak lead adayı)")
     return "\n".join(lines)
+
+
+def _discovered_lead_fields(place: dict[str, Any], city: str) -> dict[str, Any]:
+    return {
+        "isletme_adi": place.get("business_name") or "İsimsiz İşletme",
+        "yetkili": "",
+        "sehir": city.strip(),
+        "whatsapp": (place.get("phone_number") or "").strip(),
+        "ilk_iletisim_kanali": "Google Places",
+        "durum": "Yeni",
+        "oncelik": "yuksek" if place.get("low_digital_presence") else "orta",
+        "notlar": _discovery_notes(place, city),
+    }
+
+
+def request_discovered_leads(
+    db: Session,
+    owner_id: int,
+    requested_by: int,
+    *,
+    category: str,
+    places: list[dict[str, Any]],
+    city: str,
+) -> dict[str, Any]:
+    """Personelin bulduğu işletmeleri sahip onayına talep olarak gönderir."""
+    by_place, by_phone = existing_lead_index(db, owner_id)
+    requested_place_ids = pending_request_place_ids(db, owner_id)
+    created = 0
+    skipped = 0
+
+    for place in places:
+        place_id = place.get("google_place_id") or ""
+        phone_norm = normalize_phone(place.get("phone_number"))
+        if (
+            not place_id
+            or place_id in by_place
+            or (phone_norm and phone_norm in by_phone)
+            or place_id in requested_place_ids
+        ):
+            skipped += 1
+            continue
+
+        fields = normalize_lead_text_fields(_discovered_lead_fields(place, city))
+        db.add(
+            LeadRequest(
+                owner_id=owner_id,
+                requested_by=requested_by,
+                category=category,
+                status="pending",
+                tag_ids_json="[]",
+                source="google_places",
+                google_place_id=place_id,
+                latitude=place.get("latitude"),
+                longitude=place.get("longitude"),
+                google_rating=place.get("rating"),
+                google_rating_count=place.get("rating_count"),
+                **fields,
+            )
+        )
+        requested_place_ids.add(place_id)
+        created += 1
+
+    if created:
+        db.commit()
+
+    return {"created": created, "skipped": skipped}
 
 
 def import_discovered_leads(
@@ -580,18 +662,7 @@ def import_discovered_leads(
             lead_ids.append(existing.id)
             continue
 
-        payload = apply_lead_automation(
-            {
-                "isletme_adi": place.get("business_name") or "İsimsiz İşletme",
-                "yetkili": "",
-                "sehir": city.strip(),
-                "whatsapp": phone,
-                "ilk_iletisim_kanali": "Google Places",
-                "durum": "Yeni",
-                "oncelik": "yuksek" if place.get("low_digital_presence") else "orta",
-                "notlar": _discovery_notes(place, city),
-            }
-        )
+        payload = apply_lead_automation(_discovered_lead_fields(place, city))
 
         lead = Lead(
             user_id=user_id,
